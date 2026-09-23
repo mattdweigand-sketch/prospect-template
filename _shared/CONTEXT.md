@@ -1,0 +1,18 @@
+# Factory inputs
+
+One job: hold reusable configuration and common rules, separate from customer runs.
+
+| File | Owner |
+|---|---|
+| [rules.md](rules.md) | Common evidence and action boundaries |
+| [policy.example.json](policy.example.json) | Portable example values copied once to ignored policy.json |
+| [icp.example.md](icp.example.md) | Example ICP copied once to ignored icp.md |
+| [taxonomy.example.json](taxonomy.example.json) | Example signal vocabulary copied to ignored taxonomy.json |
+| [claims.example.json](claims.example.json) | Synthetic claim schema copied to ignored claims.json |
+| [adapters.example.md](adapters.example.md) | Adapter questionnaire copied once to ignored adapters.md |
+
+Inputs: the [setup questionnaire](../setup/questionnaire.md) and approved configuration changes.
+Process: change each fact in its owning file. Load only the selected workflow's sections.
+Outputs: local policy.json and adapters.md; further files are declared by setup.
+Human check: review the exact configuration and adapter capabilities before live use.
+Credentials and run data never belong here. See [portability](../setup/portability.md).

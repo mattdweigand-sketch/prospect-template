@@ -1,0 +1,76 @@
+{
+  "mode": "example",
+  "identity": {
+    "owner_email": "seller@example.com",
+    "timezone": "UTC",
+    "internal_domains": [
+      "example.com"
+    ]
+  },
+  "followup": {
+    "default_next_date_days": 2,
+    "sent_mail_hold_days_cold": 2,
+    "sent_mail_hold_days_active": 1,
+    "recycle_after_unanswered": 7,
+    "cooldown_days": 30
+  },
+  "email_voice": {
+    "greeting": "Hi {first_name},",
+    "closing": "Best,\nSeller",
+    "body": "Short, specific, one concrete question",
+    "reply_in_thread": true
+  },
+  "research": {
+    "max_sources": 5
+  },
+  "review_inputs": [
+    "_shared/adapters.md",
+    "_shared/icp.md",
+    "_shared/taxonomy.json",
+    "_shared/claims.json"
+  ],
+  "routing": {
+    "new": "propose account claim",
+    "inactive_or_house_owner": "propose transfer only for configured owner IDs",
+    "owned_with_open_opportunity": "sales handoff",
+    "owned_no_open_opportunity": "scan",
+    "other_active_owner": "owned_elsewhere",
+    "house_owner_ids": []
+  },
+  "prospector": {
+    "max_candidates": 5,
+    "admission": "one tier1 or two distinct tier2 signals"
+  },
+  "outreach": {
+    "bundle_max_age_hours": 24,
+    "suppression_days": 30,
+    "fit_mode": "warn",
+    "max_drafts": 1,
+    "recipient_sources": [
+      "existing CRM Contact",
+      "prior thread with recipient",
+      "verified enrichment"
+    ]
+  },
+  "followup_signal": {
+    "due_calendar_days": 7,
+    "growth_due_business_days": 2
+  },
+  "adoption": {
+    "enabled": false,
+    "approved_statements": {}
+  },
+  "arr_growth": {
+    "enabled": false,
+    "window_days": 30,
+    "max_accounts": 2,
+    "email_template": null
+  },
+  "refresh": {
+    "source": null,
+    "revision": null,
+    "watch_paths": [],
+    "icp_path": null,
+    "contradictions_path": null
+  }
+}

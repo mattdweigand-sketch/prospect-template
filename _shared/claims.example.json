@@ -1,0 +1,25 @@
+{
+  "source_revision": "synthetic-v1",
+  "claims": [
+    {
+      "id": "csv_export",
+      "status": "example",
+      "kind": "product_capability",
+      "claim": "The fictional Example Product can export a report as CSV.",
+      "limit": "Synthetic demonstration only. No real product, accuracy, time-saving or integration claim.",
+      "evidence": "Example Product exports a report as CSV.",
+      "source_reference": "examples/source.txt",
+      "verticals": [
+        "technology"
+      ],
+      "personas": [
+        "operations_owner"
+      ],
+      "proof": {
+        "name": null,
+        "external_ok": false
+      },
+      "approval_reference": null
+    }
+  ]
+}

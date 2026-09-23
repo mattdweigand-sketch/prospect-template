@@ -1,0 +1,19 @@
+{
+  "signals": [
+    {
+      "id": "reporting_initiative",
+      "tier": 1,
+      "freshness_days": 90,
+      "creates_work": "Evaluate a repeatable reporting workflow",
+      "target_titles": [
+        "Operations"
+      ],
+      "claim_ids": [
+        "csv_export"
+      ],
+      "example_queries": [
+        "company reporting initiative"
+      ]
+    }
+  ]
+}
