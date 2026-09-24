@@ -35,6 +35,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -67,12 +68,14 @@ def normalize(text):
 
 
 def norm_name(name):
-    return re.sub(r"[^a-z0-9]+", " ", name.lower()).strip()
+    name = unicodedata.normalize("NFC", name).casefold()
+    return " ".join("".join(c if c.isalnum() else " " for c in name).split())
 
 
 def load_taxonomy(policy_path):
     """Load qualification rules, owner timezone and each signal's source boundary."""
     policy = json.loads(Path(policy_path).read_text())
+    factory.validate_policy(policy, ("identity", "scan"))
     taxonomy = factory.taxonomy(Path(policy_path).parent)
     types = {}
     for tier, entries in taxonomy["tiers"].items():
@@ -83,9 +86,8 @@ def load_taxonomy(policy_path):
 
 
 def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
-    """checked_at is the timezone-aware moment the page was read. Defaults to now. outreach_gate.py measures elapsed time from it."""
-    checked_at = checked_at or datetime.now().astimezone()
-    if not isinstance(receipt, dict) or checked_at.tzinfo is None:
+    """Grade parsed evidence; use evaluate() for the complete input/time boundary."""
+    if not isinstance(receipt, dict) or not isinstance(checked_at, datetime) or checked_at.tzinfo is None:
         return 2, {"outcome": "unusable", "reason": "object_and_aware_timestamp_required"}
     missing = [k for k in REQUIRED if k not in receipt]
     if missing:
@@ -94,6 +96,13 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
         return 2, {"outcome": "unusable", "reason": "account_aliases_not_list"}
     if any(not isinstance(receipt[k], str) or not receipt[k].strip() for k in REQUIRED if k not in ("account_aliases", "published_date")):
         return 2, {"outcome": "unusable", "reason": "nonempty_strings_required"}
+    if any(not norm_name(value) for value in [receipt["account_name"], receipt["evidence_subject"], *receipt["account_aliases"]]):
+        return 2, {"outcome": "unusable", "reason": "account_identities_need_letters_or_digits"}
+    try:
+        account_domain = factory.domain(receipt["account_domain"])
+        event_date = date.fromisoformat(receipt["event_date"]).isoformat() if receipt.get("event_date") is not None else None
+    except (ValueError, TypeError):
+        return 2, {"outcome": "unusable", "reason": "invalid_account_domain_or_event_date"}
     url = urlparse(receipt["source_url"])
     if url.scheme not in ("http", "https") or not url.hostname:
         return 2, {"outcome": "unusable", "reason": "source_url_not_http"}
@@ -122,8 +131,8 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
     if receipt["published_date"] is None:
         if receipt["quote_speaker"] != "account":
             return 1, {"outcome": "no_usable_signal", "reason": "event_fallback_requires_first_party"}
-        domain = receipt["account_domain"].lower()
-        if url.hostname.lower() != domain and not url.hostname.lower().endswith("." + domain):
+        host = factory.domain(url.hostname)
+        if host != account_domain and not host.endswith("." + account_domain):
             return 1, {"outcome": "no_usable_signal", "reason": "event_fallback_requires_account_host"}
         if not receipt.get("event_date"):
             return 1, {"outcome": "no_usable_signal", "reason": "undated_page_without_event_date"}
@@ -147,7 +156,8 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
                    "age_days": age, "freshness_days": signal["freshness_days"]}
 
     bundle = {k: receipt[k] for k in REQUIRED}
-    bundle["event_date"] = receipt.get("event_date")
+    bundle["account_domain"] = account_domain
+    bundle["event_date"] = event_date
     bundle["published_date"] = governing.isoformat()
     bundle.update({"tier": signal["tier"], "date_basis": date_basis, "checked_on": today.isoformat(),
                    "checked_at": checked_at.isoformat(timespec="seconds"), "gate": "evidence_gate"})
@@ -157,6 +167,34 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
     if warnings:
         bundle["warnings"] = warnings
     return 0, {"outcome": "qualified", "bundle": bundle}
+
+
+def evaluate(receipt, page_text, policy_path, now=None, checked_at=None):
+    """Shared CLI/preflight boundary. Return (exit_code, JSON-compatible result).
+
+    now and checked_at accept aware datetimes or ISO timestamps. Fetch time is
+    required explicitly or in receipt.checked_at; saved evidence is never re-dated.
+    """
+    try:
+        if not isinstance(receipt, dict) or not isinstance(page_text, str):
+            raise ValueError("receipt must be an object and page_text must be text")
+        scan_policy, types = load_taxonomy(policy_path)
+        zone = ZoneInfo(scan_policy["timezone"])
+        if isinstance(now, str):
+            now = datetime.fromisoformat(now.replace("Z", "+00:00"))
+        now = datetime.now(zone) if now is None else now
+        if not isinstance(now, datetime) or now.tzinfo is None:
+            raise ValueError("now must be a timezone-aware timestamp")
+        checked = checked_at if checked_at is not None else receipt.get("checked_at")
+        if checked is None:
+            raise ValueError("record the actual source fetch time with --checked-at or receipt.checked_at")
+        if isinstance(checked, str):
+            checked = datetime.fromisoformat(checked.replace("Z", "+00:00"))
+        if not isinstance(checked, datetime) or checked.tzinfo is None or checked > now:
+            raise ValueError("checked_at must be timezone-aware and not in the future")
+        return grade(receipt, page_text, scan_policy, types, now.astimezone(zone).date(), checked)
+    except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+        return 2, {"outcome": "unusable", "reason": "input_error", "detail": str(exc)}
 
 
 def main():
@@ -170,25 +208,10 @@ def main():
     try:
         receipt = json.loads(Path(args.receipt).read_text())
         page_text = Path(args.page).read_text(errors="replace")
-        scan_policy, types = load_taxonomy(args.policy)
-        zone = ZoneInfo(scan_policy["timezone"])
-        now = datetime.fromisoformat(args.now.replace("Z", "+00:00")) if args.now else datetime.now(zone)
-        if now.tzinfo is None:
-            raise ValueError("now must be a timezone-aware timestamp")
-        today = now.astimezone(zone).date()
-        raw_checked = args.checked_at or receipt.get("checked_at")
-        if not isinstance(raw_checked, str):
-            raise ValueError("record the actual source fetch time with --checked-at or receipt.checked_at")
-        checked = datetime.fromisoformat(raw_checked.replace("Z", "+00:00"))
-        if checked.tzinfo is None or checked > now:
-            raise ValueError("checked_at must be timezone-aware and not in the future")
     except Exception as exc:  # bad input, never a traceback
         print(json.dumps({"outcome": "unusable", "reason": "input_error", "detail": str(exc)}))
         return 2
-    try:
-        code, payload = grade(receipt, page_text, scan_policy, types, today, checked_at=checked)
-    except (ValueError, TypeError, KeyError, AttributeError) as exc:
-        code, payload = 2, {"outcome": "unusable", "reason": "input_error", "detail": str(exc)}
+    code, payload = evaluate(receipt, page_text, args.policy, args.now, args.checked_at)
     print(json.dumps(payload, indent=1))
     return code
 

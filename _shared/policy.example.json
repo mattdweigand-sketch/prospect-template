@@ -14,23 +14,11 @@
     "body": "Short, specific, one concrete question",
     "anchor_reference": null
   },
-  "review_inputs": [
-    "_shared/adapters.md",
-    "_shared/icp.md",
-    "_shared/taxonomy.json",
-    "_shared/claims.json"
-  ],
   "routing": {
-    "new": "propose account claim",
-    "inactive_or_house_owner": "propose transfer only for configured owner IDs",
-    "owned_with_open_opportunity": "sales handoff",
-    "owned_no_open_opportunity": "scan",
-    "other_active_owner": "owned_elsewhere",
     "house_owner_ids": []
   },
   "prospector": {
     "max_candidates": 5,
-    "admission": "one tier1 or two distinct tier2 signals",
     "max_people_per_account": 5,
     "headcount_sources": [
       "company filing or annual report",

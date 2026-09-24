@@ -24,6 +24,8 @@ It is not a prerequisite for public research or core outreach.
 
 The review names account/CRM ID, owner/status, route, domain, data-through date, aggregate subscription and platform/service categories, paid-individual presence, privacy verdict and the exact bundle. Include the query success reference and read time as separate review metadata, outside the bundle's field allowlist. Declare only the aggregate bundle and permitted aggregate receipts as artifacts.
 
+In inputs.json, `bundle`, `crm` and `receipt` name the aggregate bundle, CRM packet and aggregate adapter receipt. The CRM packet contains account `{id, domain, owner_id, owner_is_active, open_opportunity_ids}`, crm_complete and read_reference. The aggregate receipt records success, mapping_complete, reference and the actual aware checked_at timestamp; bundle.source_reference must identify that same reference. Preflight checks these prerequisites, identity, internal-domain exclusion and the complete data date before exporting a positive category. Unknown/failed coverage stays an explicit finding in `gaps`; no public-scan task history or warm-engagement check is required for this aggregate-only workflow.
+
 Only the configured adoption.approved_statements entry for the category may be repeated in outreach. There is no outreach statement for none_found or unknown. Explain that none_found covers the supplied mapping/date and is not proof of absence; an organization may be mapped to a duplicate account. There are no effects.
 
 ## Human check

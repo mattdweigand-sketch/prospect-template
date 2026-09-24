@@ -81,10 +81,10 @@ class SafetyBoundaries(unittest.TestCase):
     def test_event_fallback_requires_first_party(self):
         pol, types = evidence_gate.load_taxonomy(SHARED / "policy.json")
         code, out = evidence_gate.grade(evidence.receipt(published_date=None, event_date="2026-09-01", quote_speaker="third_party"),
-                                        evidence.PAGE + " 2026-09-01", pol, types, evidence.TODAY)
+                                        evidence.PAGE + " 2026-09-01", pol, types, evidence.TODAY, checked_at=datetime.fromisoformat("2026-09-21T12:00:00-07:00"))
         self.assertEqual((code, out["reason"]), (1, "event_fallback_requires_first_party"))
         code, out = evidence_gate.grade(evidence.receipt(published_date=None, event_date="2026-09-01", source_url="https://example.net/article"),
-                                        evidence.PAGE + " 2026-09-01", pol, types, evidence.TODAY)
+                                        evidence.PAGE + " 2026-09-01", pol, types, evidence.TODAY, checked_at=datetime.fromisoformat("2026-09-21T12:00:00-07:00"))
         self.assertEqual((code, out["reason"]), (1, "event_fallback_requires_account_host"))
 
     def test_saved_page_recheck_preserves_fetch_time(self):
@@ -166,10 +166,14 @@ class SafetyBoundaries(unittest.TestCase):
             self.assertEqual(out["verdict"], "block")
 
     def test_growth_rejects_nonfinite_and_inconsistent_amounts(self):
-        for change in (float("nan"), float("inf"), True):
+        for change in (float("nan"), float("inf")):
             row = growth.row()
             row["net_change_usd"] = change
             self.assertEqual(growth.run(row)["held"][0]["hold"], "invalid_arr_values")
+        row = growth.row()
+        row["net_change_usd"] = True
+        with self.assertRaises(ValueError):
+            growth.run(row)
         row = growth.row()
         row["current_arr_usd"] += 10
         self.assertEqual(growth.run(row)["held"][0]["hold"], "inconsistent_arr_values")
@@ -181,7 +185,8 @@ class SafetyBoundaries(unittest.TestCase):
             self.assertEqual(growth.run(row)["verdict"], "block")
         row = growth.row()
         row["account"].pop("open_opportunity_ids")
-        self.assertEqual(growth.run(row)["held"][0]["hold"], "incomplete_live_reads")
+        with self.assertRaises(ValueError):
+            growth.run(row)
 
     def test_growth_holds_all_ambiguous_mappings(self):
         out = growth.run(growth.row(), growth.row())
@@ -296,7 +301,7 @@ class PinnedRefresh(unittest.TestCase):
         self.assertEqual(self.cli("--stamp", "--stage", self.root / "bad").returncode, 2)
 
     def test_deleted_watch_file_is_reported(self):
-        self.assertEqual(refresh_tracks.changed_watch_files("D\tknowledge/personas.md", "knowledge", ["personas.md"]), ["personas.md"])
+        self.assertEqual(refresh_tracks.changed_watch_files("D\0knowledge/personas.md\0", "knowledge", ["personas.md"]), ["personas.md"])
 
     def test_malformed_contradiction_source_prevents_staged_write(self):
         pol = factory.read(self.shared / "policy.json")

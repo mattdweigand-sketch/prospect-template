@@ -33,7 +33,28 @@ class EvidenceGate(unittest.TestCase):
         self.scan, self.types = gate.load_taxonomy(POLICY)
 
     def run_gate(self, r, page=PAGE, today=TODAY):
-        return gate.grade(r, page, self.scan, self.types, today)
+        return gate.grade(r, page, self.scan, self.types, today,
+                          datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc))
+
+    def test_shared_evaluation_requires_real_fetch_time(self):
+        now = datetime.fromisoformat("2026-09-21T12:00:00-07:00")
+        for checked in (None, "2026-09-21", "2026-09-21T12:00:00", "2026-09-21T12:00:01-07:00"):
+            with self.subTest(checked=checked):
+                code, out = gate.evaluate(receipt(), PAGE, POLICY, now, checked)
+                self.assertEqual((code, out["reason"]), (2, "input_error"))
+        fetched = "2026-09-20T11:00:00-07:00"
+        code, out = gate.evaluate(receipt(checked_at=fetched), PAGE, POLICY, now)
+        self.assertEqual(code, 0)
+        self.assertEqual(out["bundle"]["checked_at"], fetched)
+        self.assertEqual(gate.grade(receipt(), PAGE, self.scan, self.types, TODAY)[0], 2)
+
+    def test_qualified_domain_and_event_date_have_usable_shapes(self):
+        code, result = self.run_gate(receipt(account_domain="EXAMPLE.ORG."))
+        self.assertEqual(code, 0)
+        self.assertEqual(result["bundle"]["account_domain"], "example.org")
+        for changes in (dict(account_domain="example.org\t"), dict(event_date=["2026-09-01"]), dict(event_date="not-a-date")):
+            with self.subTest(changes=changes):
+                self.assertEqual(self.run_gate(receipt(**changes))[0], 2)
 
     def test_qualified(self):
         code, out = self.run_gate(receipt())
@@ -61,6 +82,23 @@ class EvidenceGate(unittest.TestCase):
 
     def test_alias_is_owned(self):
         self.assertEqual(self.run_gate(receipt(evidence_subject="acme"))[0], 0)
+
+    def test_international_names_match_without_collapsing_unrelated_entities(self):
+        for account, unrelated in (("東京商事", "大阪商事"), ("Ромашка", "Ландыш")):
+            with self.subTest(account=account):
+                r = receipt(account_name=account, account_aliases=[account], evidence_subject=account)
+                self.assertEqual(self.run_gate(r)[0], 0)
+                r["evidence_subject"] = unrelated
+                code, out = self.run_gate(r)
+                self.assertEqual((code, out["reason"]), (1, "evidence_subject_not_account_owned"))
+        self.assertEqual(self.run_gate(receipt(account_name="MÜNCHEN AG", account_aliases=["München"],
+            evidence_subject="Mu\u0308nchen AG"))[0], 0)
+
+    def test_empty_normalized_identities_are_unusable(self):
+        for change in ({"account_name": "---"}, {"account_aliases": ["🧑"]}, {"evidence_subject": "!?"}):
+            with self.subTest(change=change):
+                code, out = self.run_gate(receipt(**change))
+                self.assertEqual((code, out["reason"]), (2, "account_identities_need_letters_or_digits"))
 
     def test_stale_by_signal_type_window(self):
         code, out = self.run_gate(receipt(published_date="2026-05-01"))

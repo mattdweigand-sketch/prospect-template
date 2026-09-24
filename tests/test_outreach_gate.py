@@ -347,6 +347,12 @@ class OutreachGateTests(unittest.TestCase):
     def test_recipient_title_substring_match_allows(self):
         self.assertEqual(self.check(pk(recipient__title="Global Head of Operations and Data")), [])
 
+    def test_title_aliases_match_complete_phrases_only(self):
+        for title in ("Payroll Coordinator", "IT Procurement Coordinator", "Chief", "C"):
+            with self.subTest(title=title):
+                self.assertBlocks(pk(recipient__title=title), "outside target_titles")
+        self.assertEqual(self.check(pk(recipient__title="Regional COO, Business Services")), [])
+
     def test_quoted_executive_matches_evidence_subject(self):
         p = row_packet("report_delivery", "executive_statements", persona="economic_buyer", title="Chief Knowledge Officer")
         p["bundle"]["evidence_subject"] = "Jane Doe"
@@ -390,6 +396,76 @@ class OutreachGateTests(unittest.TestCase):
     def test_long_subject_blocks(self):
         self.assertIn("subject too long", self.check(pk(draft__subject="a b c d e f g h i j")))
 
+    def test_subject_uses_claim_proof_and_surface_checks(self):
+        for subject, reason in (("Costs fall 999%", "numbers in subject"),
+                                ("Worth 20 minutes", "numbers in subject"),
+                                ("Example Private Customer", "subject names Example Private Customer"),
+                                ("**Great news** 🎉", "subject:"),
+                                ("A seamless review", "subject: forbidden phrase")):
+            with self.subTest(subject=subject):
+                self.assertBlocks(pk(draft__subject=subject), reason)
+        policy = copy.deepcopy(POL)
+        policy["lint"]["max_body_words"] = 2
+        p = pk(draft__subject="A longer but allowed subject", draft__body="Discuss exports?")
+        self.assertEqual(og.check(p, policy, SHARED, NOW), [])
+
+    def test_repeated_selected_proof_name_remains_allowed(self):
+        d = shared_copy(lambda d: edit_row(d, "private_case_study", restamp=True,
+                                          proof={"name": "Example Public Customer", "external_ok": True}))
+        try:
+            p = row_packet("public_case_study", "operations_leader_appointment", persona="business_sponsor", title="CIO")
+            p["draft"]["body"] = "You named a Chief Operating Officer.\n\nExample Public Customer described its report review.\n\nWorth a call?"
+            self.assertEqual(self.check(p, shared=d), [])
+            edit_row(d, "public_case_study", restamp=True, proof={"name": "Example Public Customer", "external_ok": False})
+            self.assertBlocks(p, "body names Example Public Customer", shared=d)
+        finally:
+            shutil.rmtree(d)
+
+    def test_nonactionable_adoption_never_authorizes_a_sentence(self):
+        d = shared_copy(lambda d: None)
+        try:
+            policy = factory.read(d / "policy.json")
+            policy["adoption"].update(enabled=True, approved_statements={"org_adopted": "An organization subscription is present."})
+            factory.write(d / "policy.json", policy)
+            for category in ("none_found", "unknown"):
+                p = pk()
+                sentence = "Your team is adopting the service."
+                p.update(adoption_sentence=sentence, adoption_review_reference="synthetic-review", adoption_checked_at=NOW.isoformat(),
+                         adoption_bundle={"account_name": "Acme", "account_id": "account-1", "account_domain": "example.org",
+                                          "data_through_date": "2026-09-21", "mapped_org_count": 0, "org_subscribed": False,
+                                          "org_paying": False, "org_service_types": [], "org_platforms": [],
+                                          "paid_individuals_exist": False, "adoption": category, "source_reference": "synthetic-aggregate"})
+                p["draft"]["body"] += "\n\n" + sentence
+                with self.subTest(category=category):
+                    self.assertBlocks(p, "adoption sentence must equal", shared=d)
+                    policy["adoption"]["approved_statements"][category] = sentence
+                    factory.write(d / "policy.json", policy)
+                    with self.assertRaises(ValueError):
+                        self.check(p, shared=d)
+                    del policy["adoption"]["approved_statements"][category]
+                    factory.write(d / "policy.json", policy)
+        finally:
+            shutil.rmtree(d)
+
+    def test_malformed_packet_fields_and_config_are_unusable(self):
+        for section in ("bundle", "claim", "recipient", "draft", "activity"):
+            p = pk()
+            p[section] = None
+            with self.subTest(section=section), self.assertRaises(ValueError):
+                self.check(p)
+        for address in ("bad", "a@example.org,bob", ".a@example.org", "a..b@example.org"):
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                self.check(pk(recipient__email=address))
+        policy = copy.deepcopy(POL)
+        del policy["lint"]["no_markdown"]
+        with self.assertRaises(ValueError):
+            og.check(PACKET, policy, SHARED, NOW)
+
+    def test_email_domain_comparison_is_canonical_without_mutating_recipient(self):
+        p = pk(recipient__email="Jane@EXAMPLE.ORG.")
+        self.assertEqual(self.check(p), [])
+        self.assertEqual(p["recipient"]["email"], "Jane@EXAMPLE.ORG.")
+
     def test_cli_exit_codes(self):
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, dir=SHARED) as f:
             json.dump(PACKET, f)
@@ -407,6 +483,22 @@ class OutreachGateTests(unittest.TestCase):
             f.write("{}")
         p = subprocess.run(cmd[:3] + [f.name] + cmd[4:], capture_output=True, text=True)
         self.assertEqual(p.returncode, 2)
+
+
+class DraftLintTests(unittest.TestCase):
+    def test_supported_markdown_and_emoji_forms(self):
+        for text in ("Read [details](https://example.org)", "> Quotation", "_emphasis_", "Use `code`", "🇺🇸", "1️⃣"):
+            with self.subTest(text=text):
+                self.assertTrue(og.lint_draft.check(text, POL["lint"]))
+        for text in ("https://example.org/a/_path_", "It's a useful question", "Bonjour équipe, 你好"):
+            with self.subTest(text=text):
+                self.assertEqual(og.lint_draft.check(text, POL["lint"]), [])
+
+    def test_direct_lint_validates_rules(self):
+        rules = copy.deepcopy(POL["lint"])
+        del rules["no_emoji"]
+        with self.assertRaises(ValueError):
+            og.lint_draft.check("Hello", rules)
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import runs
 import wrappers
 import check_repo
+from test_run_checks import NOW, claim_inputs, outreach_run
 
 
 class WorkspaceTests(unittest.TestCase):
@@ -22,14 +23,14 @@ class WorkspaceTests(unittest.TestCase):
         shutil.copytree(ROOT, self.root, ignore=shutil.ignore_patterns(".git", "output", "__pycache__"))
         for example in (self.root / "_shared").glob("*.example.*"):
             shutil.copyfile(example, example.with_name(example.name.replace(".example", "")))
-        self.command = "signal-scan"
+        self.command = "signal-prospector"
         self.path = runs.init(self.root, "synthetic-001", self.command)
 
     def ready(self):
-        (self.path / "01_review.md").write_text("---\nstatus: ready\n---\n\n# Synthetic review\n\n## Effect A1\nUnsent example draft to buyer@example.org.\n")
+        claim_inputs(self.root, self.path)
 
     def approve(self):
-        return runs.record_review(self.root, self.path.name, "Synthetic reviewer", "test-only-approval", ["A1"])
+        return runs.record_review(self.root, self.path.name, "Synthetic reviewer", "test-only-approval", ["A1"], now=NOW)
 
     def result(self, review, effects=None):
         if effects is None:
@@ -103,26 +104,8 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_synthetic_signal_to_outreach_review(self):
         from gate_fixtures import make_shared
-        import evidence_gate
-        import outreach_gate
-        import test_evidence_gate as evidence
-        import test_outreach_gate as outreach
-        shared = make_shared(self.root / "_shared")
-        request = self.path / "request.md"
-        request.write_text(request.read_text().replace("workflow: signal-scan", "workflow: signal-outreach"))
-        policy, types = evidence_gate.load_taxonomy(shared / "policy.json")
-        code, qualified = evidence_gate.grade(evidence.receipt(), evidence.PAGE, policy, types, outreach.NOW.date(), outreach.NOW)
-        self.assertEqual(code, 0)
-        packet = outreach.pk()
-        packet["bundle"] = qualified["bundle"]
-        self.assertEqual(outreach_gate.check(packet, outreach.POL, shared, outreach.NOW), [])
-        (self.path / "source.txt").write_text(evidence.PAGE)
-        (self.path / "bundle.json").write_text(json.dumps(qualified))
-        (self.path / "packet.json").write_text(json.dumps(packet))
-        review = self.path / "01_review.md"
-        review.write_text('---\nstatus: ready\nartifacts: ["source.txt", "bundle.json", "packet.json"]\n---\n\n## Effect A1\n'
-                          + "Synthetic unsent draft, no provider called.\n"
-                          + json.dumps({"to": packet["recipient"]["email"], **packet["draft"]}, indent=2) + "\n")
+        make_shared(self.root / "_shared")
+        self.path, packet = outreach_run(self.root, "real-outreach")
         self.approve()
         self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_current")
         packet["draft"]["body"] += " An unreviewed assertion."
@@ -132,14 +115,14 @@ class WorkspaceTests(unittest.TestCase):
     def test_declared_missing_artifact_prevents_review_record(self):
         self.ready()
         review = self.path / "01_review.md"
-        review.write_text(review.read_text().replace("status: ready", 'status: ready\nartifacts: ["bundle.json"]'))
+        review.write_text(review.read_text().replace('artifacts: []', 'artifacts: ["bundle.json"]'))
         with self.assertRaises(ValueError):
             self.approve()
 
     def test_changed_bundle_invalidates_review(self):
         self.ready()
         review = self.path / "01_review.md"
-        review.write_text(review.read_text().replace("status: ready", 'status: ready\nartifacts: ["bundle.json"]'))
+        review.write_text(review.read_text().replace('artifacts: []', 'artifacts: ["bundle.json"]'))
         bundle = self.path / "bundle.json"
         bundle.write_text('{"source": "synthetic"}')
         self.approve()
@@ -149,7 +132,7 @@ class WorkspaceTests(unittest.TestCase):
     def test_run_cannot_declare_another_runs_input(self):
         self.ready()
         review = self.path / "01_review.md"
-        review.write_text(review.read_text().replace("status: ready", 'status: ready\nartifacts: ["../other/bundle.json"]'))
+        review.write_text(review.read_text().replace('artifacts: []', 'artifacts: ["../other/bundle.json"]'))
         with self.assertRaises(ValueError):
             self.approve()
 
@@ -196,13 +179,17 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(runs.status(self.root, other.name)["state"], "review_stale")
 
     def test_expected_configuration_change_is_not_unreviewed_drift(self):
-        target = "_shared/policy.json"
-        changed = (self.root / target).read_text() + "\n"
-        after = {"A1": {target: hashlib.sha256(changed.encode()).hexdigest()}}
-        (self.path / "01_review.md").write_text("---\nstatus: ready\nexpected_after: " + json.dumps(after) + "\n---\n\n## Effect A1\nReviewed synthetic policy revision.\n")
-        review = self.approve()
-        (self.root / target).write_text(changed)
-        self.assertEqual(runs.status(self.root, self.path.name)["state"], "recovery_required")
+        from test_setup import SetupTests
+        setup = SetupTests("test_product_and_service_businesses_install_their_own_mapping")
+        setup.setUp()
+        self.addCleanup(setup.doCleanups)
+        path, post, source, _ = setup.configure()
+        setup.review(path, post)
+        review = json.loads((path / "review.json").read_text())
+        for name in ("policy.json", "claims.json", "taxonomy.json", "icp.md", "adapters.md"):
+            shutil.copyfile(post / name, setup.shared / name)
+        self.assertEqual(runs.status(setup.root, path.name)["state"], "recovery_required")
+        self.path, self.root = path, setup.root
         self.result(review)
         self.assertEqual(runs.status(self.root, self.path.name)["state"], "completion_recorded")
 

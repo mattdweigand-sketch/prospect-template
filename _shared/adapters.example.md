@@ -22,12 +22,15 @@ read before marking a deployment operational.
 Provider/tools, field maps and reviewed validation reference: **unconfigured**.
 
 - Resolve account by ID, name and normalized website domain. Return every match, account ID/name/website, owner ID/name/active boolean, employee count and source/date, industry, and all open opportunity IDs. Define the exact open-opportunity predicate and pagination; missing is not an empty list.
-- Normalize domain consistently: lowercase, remove scheme, www, path, query, fragment and port. Reject blank/invalid/internal domains and do not collapse unrelated buying entities. A CRM replica cannot settle current ownership, opportunity status or duplicate identity.
+- Convert a website URL to its host before building a packet. Compare lowercase IDNA hosts with one terminal DNS dot removed; reject embedded whitespace/control characters. Do not collapse unrelated buying entities. Gates reject invalid/internal domains after the same canonicalization. A CRM replica cannot settle current ownership, opportunity status or duplicate identity.
 - Contacts: account association, ID, name/first/last/title and verified email with source. Read all exact-email matches, case-insensitively. Define verification status and bounded enrichment fallback; no pattern-generated email.
+- Validate one supported mailbox per address field. Use canonical address identities for comparisons while preserving the exact reviewed address in draft payloads.
 - Tasks/events: account/contact links, ID, owner ID/name, subtype, status, subject, description and aware/date-normalized activity time. Document which provider field means a completed call/email, event date and scan task creation date. Return complete lists over the requested window; do not prefilter away scan integration-owner exclusions from outreach suppression.
+- For scan, retrieve at least the maximum of outreach.activity_lookback_days and scan.warm_engagement.lookback_days. Keep owner IDs, subjects and aware creation times for the deterministic warm-engagement check. Missing CRM coverage permits a public finding but prevents an actionable handoff.
 - Keep each task's exact provider status in the packet. Configure policy.outreach.task_status_map to classify each known value as completed, open or cancelled, based on provider documentation and verified reads. For example, a provider's Done may map to completed; this is not an assumed universal mapping. Unrecognized/missing statuses stop outreach. Configure suppressing_task_subtypes from the provider's email/call categories. Validate completed, open, cancelled and unknown cases before live use.
 - Prospect write allowlist: account create (name, website, owner, verified employee count); account owner transfer (owner only); contact create (account, first/last name, title, verified email). Supply exact native field names and required defaults before review. Existing contacts are reused. No merge/delete/opportunity/task writes through this adapter.
 - Follow-up write: normalized subject, account_id, contact_id, owner_id, status, priority, subtype, due_date, description mapped to exact native task fields. Configure closed statuses and identify who owns completed Email sync. No duplicate email logging and no undeclared Type/default fields.
+- Follow-up duplicate reads return ID, subject, status and description for every task; an empty description is explicit. Missing fields are incomplete input, never a blank completed read. Unknown nonblank statuses remain open unless explicitly configured as closed.
 - Before writes, repeat relevant reads; after each returned ID, perform an independent read of every approved field. Document provider idempotency/error/uncertain-result behavior. Do not retry a possible write without checking whether it landed.
 
 ## Public search and fetch
@@ -123,7 +126,7 @@ ARR on every date from through_date-window_days through through_date inclusive.
 Reject duplicate/null/missing days; never zero-fill. Baseline and current use
 those exact endpoints, with documented currency/rounding (the gate's *_usd
 fields mean USD and accept arithmetic tolerance 0.01). Require positive net
-change and rank descending, ties by account ID. Reject duplicate organizations
+change and rank descending, ties by case-sensitive account ID. Reject duplicate organizations
 or accounts in the selected mapping. Use the final day's organization name and
 subscription platform; allowed_platforms is deployment policy.
 
@@ -138,6 +141,9 @@ Tests: duplicate organization/domain/account mapping, each missing/duplicate/nul
 daily snapshot, zero/negative/nonfinite/inconsistent growth, unapproved platform,
 communications false/unknown, owner/open-deal/headcount changes, zero/one/multiple
 contacts, account-wide activity at the suppression boundary, ranking and caps.
+Null mapping IDs are permitted only for explicitly unresolved, held candidates;
+eligible accounts, organizations and contacts need nonblank IDs. A complete
+no-contact response is exactly an empty list. Include the verified headcount source.
 Local gate tests cover normalized inputs; they do not verify an unimplemented SQL
 adapter. Keep raw series and query outputs out of public artifacts and CRM.
 

@@ -17,6 +17,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import check_repo
+from test_run_checks import crm, handoff
 
 NOW = datetime(2026, 9, 22, 6, 30, tzinfo=timezone.utc)
 DAY = NOW.date()
@@ -50,7 +51,7 @@ class FreshInstall(unittest.TestCase):
         return result.stdout
 
     def cli(self, script, *args, code=0, stdin=None):
-        clock = ["--now", NOW.isoformat()] if script in ("evidence_gate", "outreach_gate", "followup_gate") else []
+        clock = ["--now", NOW.isoformat()] if script in ("evidence_gate", "outreach_gate", "followup_gate") or (script == "runs" and args[0] in ("record-review", "preflight")) else []
         out = self.command([sys.executable, "-B", "scripts/" + script + ".py", *map(str, args), *clock], code, stdin=stdin)
         try:
             return json.loads(out)
@@ -63,7 +64,7 @@ class FreshInstall(unittest.TestCase):
     def state(self, name, expected):
         self.assertEqual(self.cli("runs", "status", name)["state"], expected)
 
-    def review_and_complete(self, name, artifacts, effects=None, postimages=None):
+    def review_and_complete(self, name, artifacts, effects=None, postimages=None, source=None, arr_packet=None):
         path = self.path(name)
         effects = effects or {}
         after = {"A1": {"_shared/" + key: digest(value) for key, value in postimages.items()}} if postimages else {}
@@ -75,8 +76,11 @@ class FreshInstall(unittest.TestCase):
             text += "\n## Effect " + key + "\n" + json.dumps(payload, indent=2) + "\n"
         (path / "01_review.md").write_text(text)
         self.state(name, "awaiting_human_review")
+        options = ["--source", source] if source else []
+        options += ["--arr-packet", "-"] if arr_packet is not None else []
         self.cli("runs", "record-review", name, "--reviewer", "Synthetic test",
-                 "--approval-ref", "synthetic-only", "--effects", *effects)
+                 "--approval-ref", "synthetic-only", *options, "--effects", *effects,
+                 stdin=json.dumps(arr_packet) if arr_packet is not None else None)
         self.state(name, "review_current")
         if postimages:
             for key, source in postimages.items():
@@ -108,6 +112,10 @@ class FreshInstall(unittest.TestCase):
         claims = json.loads((proposal / "claims.json").read_text())
         claims["claims"][0].update(status="approved", source_reference="products/export.md", approval_reference="synthetic-only")
         write(proposal / "claims.json", claims)
+        import factory
+        fm = factory.frontmatter(proposal)
+        fm["status"] = "configured"
+        factory.write_frontmatter(proposal, fm)
         names = ("claims.json", "taxonomy.json", "icp.md")
         before = {name: digest(self.shared / name) for name in names}
         report = self.cli("refresh_tracks", "--source", source, "--revision", revision, "--shared", proposal,
@@ -117,10 +125,13 @@ class FreshInstall(unittest.TestCase):
         self.assertEqual(report["missing_pages"], [])
         self.assertEqual(before, {name: digest(self.shared / name) for name in names})
         write(path / "source-report.json", report)
+        write(path / "inputs.json", {"schema_version": 1, "effects": {"A1": {"kind": "configuration", "input": "postimages"}}, "gaps": [],
+                                      "postimages": "postimages", "source_revision": revision,
+                                      "diagnostic": {"shared": "proposal", "result": "source-report.json", "revision": revision}})
         self.cli("build_pairings", "--shared", post)
         self.review_and_complete("signal-refresh", ["source-report.json"] + ["postimages/" + name for name in names],
                                  {"A1": {name: digest(post / name) for name in names}},
-                                 {name: post / name for name in names})
+                                 {name: post / name for name in names}, source=source)
         report = self.cli("refresh_tracks", "--source", source, "--revision", revision)
         self.assertTrue(report["unchanged"])
         self.assertEqual(report["unstamped"], [])
@@ -151,7 +162,8 @@ class FreshInstall(unittest.TestCase):
         quote = "Example Account announced a reporting initiative for its operations team."
         receipt = {"account_name": "Example Account", "account_aliases": ["Example Account"],
                    "account_domain": "example.org", "source_url": "https://example.org/news", "published_date": DAY.isoformat(),
-                   "quote": quote, "evidence_subject": "Example Account", "signal_type": "reporting_initiative", "quote_speaker": "account"}
+                   "quote": quote, "evidence_subject": "Example Account", "signal_type": "reporting_initiative", "quote_speaker": "account",
+                   "checked_at": (NOW - timedelta(minutes=5)).isoformat()}
         write(path / "receipt.json", receipt)
         (path / "source.txt").write_text(quote + "\nSynthetic source only.\n")
         gate = self.cli("evidence_gate", "--receipt", path / "receipt.json", "--page", path / "source.txt",
@@ -175,9 +187,12 @@ class FreshInstall(unittest.TestCase):
         policy["arr_growth"].update(enabled=True, email_template={"subject": "Reporting workflow", "greeting_person": "Hi {first_name},",
             "greeting_team": "Hi {account_name} team,", "body": "Would a reporting review be useful?\n\nBest,\nSeller"})
         policy["adoption"]["enabled"] = True
+        policy["email_voice"]["anchor_reference"] = "synthetic-voice"
         policy["refresh"].update(source=str(self.base / "source"), watch_dirs=["products"])
         write(self.shared / "policy.json", policy)
         self.refresh()
+        write(path / "crm.json", crm(policy, NOW))
+        write(path / "inputs.json", {"schema_version": 1, "effects": {}, "gaps": [], "sources": [{"receipt": "receipt.json", "page": "source.txt", "result": "gate.json"}], "crm": "crm.json", "verdict": "verdict.json"})
         self.review_and_complete("signal-scan", ["receipt.json", "source.txt", "gate.json", "verdict.json"])
 
         path = self.path("signal-prospector")
@@ -190,6 +205,11 @@ class FreshInstall(unittest.TestCase):
         self.assertTrue(routing["claimable"])
         self.assertEqual(routing["route"], "claim_new")
         write(path / "routing.json", routing)
+        for ref in ("receipt.json", "source.txt", "gate.json"):
+            shutil.copyfile(self.path("signal-scan") / ref, path / ref)
+        write(path / "inputs.json", {"schema_version": 1, "effects": {"A1": {"kind": "account_create", "input": "candidate.json"}}, "gaps": [],
+                                      "sources": [{"receipt": "receipt.json", "page": "source.txt", "result": "gate.json"}],
+                                      "candidates": [{"receipt": "candidate.json", "result": "routing.json", "sources": ["gate.json"]}]})
         self.review_and_complete("signal-prospector", ["candidate.json", "routing.json"],
                                  {"A1": {"operation": "synthetic account create", "name": "Example Account", "owner_id": "example-owner"}})
 
@@ -199,6 +219,9 @@ class FreshInstall(unittest.TestCase):
                     "org_subscribed": False, "org_paying": False, "org_service_types": [], "org_platforms": [],
                     "paid_individuals_exist": True, "adoption": "individuals_only", "source_reference": "synthetic-aggregate"}
         write(path / "adoption.json", adoption)
+        write(path / "crm.json", crm(policy, NOW))
+        write(path / "aggregate.json", {"success": True, "mapping_complete": True, "reference": "synthetic-aggregate", "checked_at": NOW.isoformat()})
+        write(path / "inputs.json", {"schema_version": 1, "effects": {}, "gaps": [], "bundle": "adoption.json", "crm": "crm.json", "receipt": "aggregate.json"})
         self.assertEqual(self.cli("privacy_check", "--bundle", path / "adoption.json")["verdict"], "clean")
         self.review_and_complete("signal-user-scan", ["adoption.json"])
 
@@ -220,6 +243,8 @@ class FreshInstall(unittest.TestCase):
         result = self.cli("outreach_gate", "--packet", path / "packet.json")
         self.assertEqual((result["verdict"], result["flags"]), ("allow", []))
         write(path / "gate.json", result)
+        write(path / "inputs.json", {"schema_version": 1, "effects": {"A1": {"kind": "draft", "input": "packet.json"}}, "gaps": [],
+                                      "packet": "packet.json", "result": "gate.json", "handoff": handoff(self.root, self.path("signal-scan"), path, "gate.json")})
         self.review_and_complete("signal-outreach", ["packet.json", "body.txt", "gate.json"],
                                  {"A1": {"to": outreach["recipient"]["email"], **outreach["draft"]}})
         saved = (path / "packet.json").read_bytes()
@@ -239,6 +264,8 @@ class FreshInstall(unittest.TestCase):
         write(path / "packet.json", followup)
         result = self.cli("followup_gate", "--packet", path / "packet.json")
         write(path / "gate.json", result)
+        write(path / "inputs.json", {"schema_version": 1, "effects": {"A1": {"kind": "task", "input": "packet.json"}}, "gaps": [], "mode": "standard",
+                                      "packet": "packet.json", "result": "gate.json", "handoff": handoff(self.root, self.path("signal-outreach"), path, "packet.json")})
         self.review_and_complete("signal-followup", ["packet.json", "gate.json"], {"A1": result["task"]})
         write(self.base / "duplicate.json", {**followup, "tasks": [{"id": "task-1", **result["task"]}]})
         self.assertEqual(self.cli("followup_gate", "--packet", self.base / "duplicate.json", code=1)["verdict"], "block")
@@ -256,7 +283,10 @@ class FreshInstall(unittest.TestCase):
         self.assertEqual(len(result["selected"]), 1)
         draft = result["selected"][0]["draft"]
         write(path / "draft.json", draft)
-        self.review_and_complete("signal-arr-growth", ["draft.json"], {"A1": draft})
+        write(path / "selection.json", {"retention_authorized": True, "success": True, "reference": "synthetic-selection", "immutable_input_reference": "immutable-synthetic-snapshot-1", "input_reference_kind": "immutable_snapshot"})
+        write(path / "inputs.json", {"schema_version": 1, "effects": {"A1": {"kind": "draft", "input": "draft.json"}}, "gaps": [],
+                                      "drafts": [{"account_id": "account-1", "draft": "draft.json"}], "receipt": "selection.json"})
+        self.review_and_complete("signal-arr-growth", ["draft.json"], {"A1": draft}, arr_packet={"data_through_date": (DAY - timedelta(days=1)).isoformat(), "rows": [row], "immutable_input_reference": "immutable-synthetic-snapshot-1", "input_reference_kind": "immutable_snapshot"})
         followup["signal"] = {"signal_type": "arr_growth", "claim_id": "arr_growth"}
         followup["sent"][0].update(to=draft["to"], subject=draft["subject"])
         followup["contacts"][0]["email"] = draft["to"]

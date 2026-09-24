@@ -12,7 +12,6 @@ import json
 from pathlib import Path
 import re
 import sys
-from zoneinfo import ZoneInfo
 
 import approval
 import build_pairings
@@ -20,39 +19,13 @@ import factory
 import refresh_tracks
 
 
-def nonblank(value):
-    return isinstance(value, str) and bool(value.strip())
-
-
-def strings(value, empty=False):
-    return isinstance(value, list) and (empty or bool(value)) and all(nonblank(v) for v in value) and len(value) == len(set(value))
-
-
-def require(condition, message):
-    if not condition:
-        raise ValueError(message)
+nonblank = factory.nonblank
+strings = factory.strings
+require = factory.require
 
 
 def structure(policy, doc, tax, icp):
-    require(policy.get("schema_version") == 2 and policy.get("mode") in ("example", "live"), "policy must use schema 2 and example/live mode")
-    identity = policy["identity"]
-    require(all(nonblank(identity.get(k)) for k in ("owner_id", "owner_email", "timezone")), "configure owner ID, email and timezone")
-    require(re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", identity["owner_email"]), "owner email is malformed")
-    ZoneInfo(identity["timezone"])
-    require(strings(identity.get("internal_domains")), "configure internal domains")
-    outreach = policy["outreach"]
-    factory.task_status_map(outreach)
-    for field in ("suppression_days", "activity_lookback_days", "bundle_max_age_hours", "subject_max_words", "max_drafts"):
-        require(type(outreach.get(field)) is int and outreach[field] >= (0 if field == "suppression_days" else 1), "invalid outreach." + field)
-    require(outreach["activity_lookback_days"] >= outreach["suppression_days"], "activity lookback must cover suppression")
-    require(outreach.get("fit_mode") in ("warn", "block"), "fit_mode must be warn or block")
-    require(strings(outreach.get("recipient_sources")), "configure recipient sources")
-    require(type(outreach["lint"].get("max_body_words")) is int and outreach["lint"]["max_body_words"] > 0, "configure a positive body word limit")
-    require(all(nonblank(policy["email_voice"].get(k)) for k in ("greeting", "closing", "body")), "configure email voice")
-    for capability in ("adoption", "arr_growth"):
-        require(type(policy[capability].get("enabled")) is bool, "capabilities must be explicitly enabled or disabled")
-    required_inputs = {"_shared/adapters.md", "_shared/icp.md", "_shared/taxonomy.json", "_shared/claims.json"}
-    require(strings(policy.get("review_inputs")) and required_inputs <= set(policy["review_inputs"]), "review_inputs must cover all messaging configuration")
+    factory.validate_policy(policy)
     territory = icp["territory"]
     low, high = territory["min_employees"], territory["max_employees"]
     require(type(low) is int and type(high) is int and 0 <= low <= high, "invalid ICP employee range")

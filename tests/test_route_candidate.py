@@ -1,11 +1,13 @@
 """Synthetic regression tests; no live services."""
 import json
+import copy
+from datetime import datetime, timedelta
 import subprocess
 import sys
 import tempfile
 import unittest
 
-from gate_fixtures import SCRIPTS, SHARED
+from gate_fixtures import SCRIPTS, SHARED, make_shared
 sys.path.insert(0, str(SCRIPTS))
 import route_candidate as rc  # noqa: E402
 
@@ -80,6 +82,46 @@ class RouteCandidateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rc.check(receipt(score=9), RULES)
 
+    def test_normalized_internal_domains_and_invalid_hosts(self):
+        for domain in ("EXAMPLE.COM.", "team.example.com."):
+            self.assertEqual(rc.check(receipt(domain=domain), RULES)["route"], "internal_domain")
+        for domain in ("example.com\t", "example.com\n", "https://example.org", "example..org", "example.org:443"):
+            with self.subTest(domain=domain), self.assertRaises(ValueError):
+                rc.check(receipt(domain=domain), RULES)
+        self.assertEqual(rc.check(receipt(domain="EXAMPLE.ORG."), RULES)["domain"], "example.org")
+
+    def test_malformed_owner_and_opportunity_records_are_unusable(self):
+        cases = [dict(account_exists=True, owner_id=v, owner_is_active=False) for v in (None, "", [], ["owner-2"], 1)]
+        cases += [dict(owner_id="owner-2"), dict(owner_is_active=False), dict(open_opportunity_ids=["deal-1"])]
+        cases += [dict(account_exists=True, owner_id="owner-2", owner_is_active=True, open_opportunity_ids=v)
+                  for v in (None, "deal-1", [None], [1], [""])]
+        cases += [dict(signals=[{"signal_type": [], "tier": "tier1"}]), dict(signals=[{"signal_type": "executive_statements", "tier": []}])]
+        for changes in cases:
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                rc.check(receipt(**changes), RULES)
+
+    def test_account_rules_do_not_require_taxonomy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            shared = make_shared(directory)
+            (shared / "taxonomy.json").unlink()
+            self.assertEqual(rc.load_account_rules(shared)["owner"], "owner-1")
+
+    def test_optional_existing_account_id_for_adoption_identity(self):
+        self.assertEqual(rc.check(receipt(account_exists=True, account_id="account-1", owner_id="owner-1", owner_is_active=True), RULES)["route"], "scan")
+        self.assertTrue(rc.check(receipt(account_id=None), RULES)["claimable"])
+        for changes in (dict(account_id="account-1"), dict(account_exists=True, account_id=None, owner_id="owner-1", owner_is_active=True)):
+            with self.assertRaises(ValueError):
+                rc.check(receipt(**changes), RULES)
+
+    def test_conflicting_legacy_admission_is_not_ignored(self):
+        with tempfile.TemporaryDirectory() as directory:
+            shared = make_shared(directory)
+            policy = json.loads((shared / "policy.json").read_text())
+            policy["prospector"]["admission"] = "three tier2 signals"
+            (shared / "policy.json").write_text(json.dumps(policy))
+            with self.assertRaises(ValueError):
+                rc.load_rules(shared)
+
     def test_icp_rules_load(self):
         self.assertEqual(RULES["vertical_rank"]["professional_services"], 1)
         self.assertIn("unsupported_service_requirement", RULES["hard_dq"])
@@ -121,6 +163,71 @@ class RouteCandidateTests(unittest.TestCase):
         p = subprocess.run([sys.executable, str(SCRIPTS / "route_candidate.py"), "--receipt", f.name, "--shared", str(SHARED)],
                            capture_output=True, text=True)
         self.assertEqual(p.returncode, 2)
+
+
+class ScanRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.policy = json.loads((SHARED / "policy.json").read_text())
+        self.policy["scan"]["warm_engagement"].update(lookback_days=45, ignored_owner_ids=["integration"])
+        self.now = datetime.fromisoformat("2026-09-21T12:00:00-07:00")
+        self.packet = {"account": {"id": "account-1", "name": "Example", "domain": "example.org",
+            "owner_id": "owner-1", "owner_is_active": True, "open_opportunity_ids": []},
+            "tasks": [], "crm_complete": True, "tasks_complete": True,
+            "activity_since": (self.now.date() - timedelta(days=45)).isoformat(), "read_reference": "complete-crm-read"}
+
+    def run_route(self):
+        return rc.scan_route(self.packet, self.policy, self.now)
+
+    def task(self, owner="other-owner", days=40, subject="Re: planning"):
+        return {"id": "task-1", "owner_id": owner, "subject": subject,
+                "created_at": (self.now - timedelta(days=days)).isoformat()}
+
+    def test_warm_task_between_windows_stops_handoff(self):
+        self.packet["tasks"] = [self.task()]
+        result = self.run_route()
+        self.assertEqual((result["required_lookback_days"], result["route"], result["handoff_eligible"]), (45, "warm_engaged", False))
+        self.assertEqual(result["warm_tasks"], self.packet["tasks"])
+
+    def test_insufficient_history_or_incomplete_reads_are_limited(self):
+        for field, value in (("activity_since", (self.now.date() - timedelta(days=30)).isoformat()),
+                             ("crm_complete", False), ("tasks_complete", False), ("account", None),
+                             ("read_reference", None)):
+            original = copy.deepcopy(self.packet)
+            self.packet[field] = value
+            self.assertFalse(self.run_route()["handoff_eligible"])
+            self.packet = original
+
+    def test_own_and_ignored_activity_do_not_stop_scan(self):
+        for owner in ("owner-1", "integration"):
+            self.packet["tasks"] = [self.task(owner=owner)]
+            self.assertTrue(self.run_route()["handoff_eligible"])
+            self.assertEqual(self.run_route()["other_owner_ids"], [])
+
+    def test_open_deal_precedes_warm_and_other_owner(self):
+        self.packet["account"].update(owner_id="other-owner", open_opportunity_ids=["deal-1"])
+        self.packet["tasks"] = [self.task()]
+        self.assertEqual(self.run_route()["route"], "active_deal")
+
+    def test_other_owner_and_internal_domains_never_handoff(self):
+        self.packet["account"]["owner_id"] = "other-owner"
+        self.assertEqual(self.run_route()["route"], "owned_elsewhere")
+        self.packet["account"]["domain"] = "example.com."
+        self.assertEqual(self.run_route()["route"], "internal_domain")
+
+    def test_warm_boundary_and_nonmatching_subject(self):
+        for days, subject, expected in ((45, "Re: planning", "warm_engaged"),
+                                        (46, "Re: planning", "scan"), (1, "Planning", "scan")):
+            self.packet["tasks"] = [self.task(days=days, subject=subject)]
+            self.assertEqual(self.run_route()["route"], expected)
+
+    def test_invalid_task_and_clock_inputs_raise(self):
+        for task in ({}, {**self.task(), "created_at": "2026-09-20"}, {**self.task(), "owner_id": None},
+                     self.task(days=-1)):
+            self.packet["tasks"] = [task]
+            with self.assertRaises(ValueError):
+                self.run_route()
+        with self.assertRaises(ValueError):
+            rc.scan_route(self.packet, self.policy, self.now.replace(tzinfo=None))
 
 
 if __name__ == "__main__":

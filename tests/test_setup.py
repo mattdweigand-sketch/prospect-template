@@ -160,8 +160,12 @@ class SetupTests(unittest.TestCase):
         after = {"A1": {"_shared/" + name: digest(post / name) for name in names}}
         (run / "01_review.md").write_text("---\nstatus: ready\nartifacts: " + json.dumps(artifacts) +
                                          "\nexpected_after: " + json.dumps(after) + "\n---\n\n## Effect A1\nSynthetic installation only.\n")
+        factory.write(run / "inputs.json", {"schema_version": 1, "effects": {"A1": {
+            "kind": "configuration", "input": "postimages"}}, "gaps": [], "postimages": "postimages",
+            "source_revision": factory.claim_document(post)["source_revision"], "setup_result": "validation.json"})
         self.assertEqual(self.cli("runs", "status", run.name)["state"], "awaiting_human_review")
-        self.cli("runs", "record-review", run.name, "--reviewer", "Synthetic test", "--approval-ref", "test-only", "--effects", "A1")
+        self.cli("runs", "record-review", run.name, "--reviewer", "Synthetic test", "--approval-ref", "test-only", "--effects", "A1",
+                 "--source", factory.read(post / "policy.json")["refresh"]["source"])
         return names
 
     def test_product_and_service_businesses_install_their_own_mapping(self):
@@ -226,7 +230,9 @@ class SetupTests(unittest.TestCase):
                    ("claims.json", lambda d: d["claims"][0].update(approved=None)),
                    ("taxonomy.json", lambda d: d["signals"][0].update(claim_ids=["unknown"])),
                    ("policy.json", lambda d: d["email_voice"].update(anchor_reference=None)),
-                   ("policy.json", lambda d: d["outreach"].update(activity_lookback_days=1))]
+                   ("policy.json", lambda d: d["outreach"].update(activity_lookback_days=1)),
+                   ("policy.json", lambda d: d["outreach"]["lint"].pop("forbidden_phrases")),
+                   ("policy.json", lambda d: d.pop("scan"))]
         for name, edit in changes:
             with self.subTest(name=name, edit=edit):
                 path, before = post / name, (post / name).read_bytes()
@@ -297,6 +303,54 @@ class SetupTests(unittest.TestCase):
         factory.write(manifest, {"sources": sources})
         (run / "escape").symlink_to(self.root)
         self.cli("source_snapshot", "--manifest", manifest, "--destination", run / "escape/escaped-source", code=2)
+
+
+class PolicyValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.policy = factory.read(ROOT / "_shared/policy.example.json")
+
+    def test_all_consumed_settings_validate_before_use(self):
+        factory.validate_policy(self.policy)
+        changes = [lambda p: p["identity"].update(timezone="Unknown/Zone"),
+                   lambda p: p["identity"].update(internal_domains=["exam\tple.com"]),
+                   lambda p: p["outreach"]["lint"].update(no_markdown=1),
+                   lambda p: p["followup_signal"]["task"].update(description="{unknown}"),
+                   lambda p: p["scan"]["warm_engagement"].update(lookback_days=True),
+                   lambda p: p["adoption"].update(approved_statements={"unknown": "A guessed sentence."}),
+                   lambda p: p["refresh"].update(watch_dirs=["../outside"])]
+        for change in changes:
+            with self.subTest(change=change):
+                value = copy.deepcopy(self.policy)
+                change(value)
+                with self.assertRaises(ValueError):
+                    factory.validate_policy(value)
+
+    def test_sections_do_not_require_unrelated_workflow_configuration(self):
+        self.policy.pop("scan")
+        self.policy.pop("arr_growth")
+        factory.validate_policy(self.policy, ("identity", "outreach"))
+        with self.assertRaises(ValueError):
+            factory.validate_policy(self.policy)
+
+    def test_deprecated_fixed_policy_accepts_only_historical_defaults(self):
+        self.policy["routing"]["new"] = "propose account claim"
+        self.policy["prospector"]["admission"] = "one tier1 or two distinct tier2 signals"
+        factory.validate_policy(self.policy)
+        for section, key in (("routing", "new"), ("prospector", "admission")):
+            value = copy.deepcopy(self.policy)
+            value[section][key] = "skip the fixed check"
+            with self.assertRaises(ValueError):
+                factory.validate_policy(value)
+
+    def test_domain_and_mailbox_comparisons_reject_malformed_identity(self):
+        self.assertEqual(factory.domain("EXAMPLE.COM."), "example.com")
+        self.assertEqual(factory.email("Buyer@EXAMPLE.COM."), "buyer@example.com")
+        for value in ("example.com..", "example.com\t", "https://example.com", ".example.com", "example.com:443"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                factory.domain(value)
+        for value in (None, "Buyer <buyer@example.com>", "buyer..name@example.com", "buyer@example", "buyer@example.com,other@example.com"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                factory.email(value)
 
 
 if __name__ == "__main__":

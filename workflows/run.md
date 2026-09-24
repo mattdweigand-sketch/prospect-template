@@ -17,12 +17,26 @@ Work within the request and write output/{run-id}/01_review.md. It contains
 source coverage, attributed facts, unresolved gaps, the requested deliverable,
 and exact proposed effects where relevant. Number effects with headings such
 as `## Effect A1`; keep their full fields or draft text under that heading.
-Read-only deliverables have no effect headings. List every accompanying source,
-bundle or deliverable file in an artifacts frontmatter JSON list, using run-relative
-paths such as artifacts: ["bundle.json", "source.txt"]. Missing declared files
-prevent review recording; changing their bytes invalidates the recorded review. The chosen workflow defines
-its content checks and human review. Only after those checks pass, change
-the artifact's frontmatter from `status: draft` to `status: ready`.
+Read-only deliverables have no effect headings. Fill inputs.json with the selected
+workflow's named inputs and explicit coverage gaps. Its effects map must bind
+every Effect heading, for example `"A1": {"kind": "draft", "input": "packet.json"}`.
+Paths are run-relative regular files; manifests contain no executable commands.
+Account/contact creation, owner transfer, draft, task and configuration effects
+are allowed only in their owning workflow. A new-account contact also names its
+account_effect; other effect graphs are unsupported.
+
+Keep extra human review materials in the artifacts frontmatter JSON list,
+for example `artifacts: ["voice.txt"]`. Machine inputs are included in the snapshot
+automatically. Missing files prevent review; edits invalidate recorded hashes.
+After preparing the deliverable, set `status: ready` and run:
+
+`python3 scripts/runs.py preflight RUN_ID`
+
+Preflight replays the complete gates and compares saved results. A saved allow
+flag is insufficient. Include its issues in the review. Explicit gaps permit a
+limited finding; every proposed effect still needs passing prerequisites, even
+if the user will approve only a subset. Handoff eligibility belongs to the
+selected artifact, never to the report merely because it was reviewed.
 
 Human checkpoint: show the review to the user and allow edits. Do not proceed
 to stage 02 until they have read it. Record the real conversation reference,
@@ -32,10 +46,40 @@ reviewer and exactly approved effect IDs in output/{run-id}/review.json using:
 
 Omit --effects for a reviewed read-only deliverable. This command records an
 existing approval; running it is never a way to obtain one. The snapshot covers
-the review, request, selected contracts, configured policy inputs, route registry,
-run-state implementation and selected helper dependencies. Changes
-invalidate it. Source files referenced by the review must be rechecked before
-effects if their contents could change; their paths alone are not identity.
+the review, manifest, checked files, selected contracts/helpers and the factory
+files declared by the route registry. The compact validation record stays in
+review.json. The same preflight runs during record-review. Setup/refresh require
+`--source SOURCE_CLONE`; ARR requires `--arr-packet -`. `--now` is for deterministic
+synthetic replay; live work uses the current time. Preflight returns 0 when
+reviewable, 1 for unmet prerequisites and 2 for unusable input.
+
+## Named handoffs
+
+The downstream manifest's handoff object names run_id, workflow,
+approval_reference, review (a retained copy of upstream review.json), selected
+(the upstream artifact path), and artifacts (a map from upstream paths to local
+copies). Retain only the selected export and its required artifacts. Preflight
+checks the review contract, named selection and hashes. If the exact upstream
+run exists locally, its review must still be current; otherwise use the explicit
+portable export. Never search unrelated runs or fabricate missing receipts.
+Exports preserve the checked account ID. Follow-up's account and contact
+association must match that frozen target, including across a portable handoff.
+
+Outreach preserves the original reviewed source artifacts. A refreshed source
+has a separate receipt/page/result and actual fetch time; changed page bytes
+alone do not invalidate provenance, but changed signal facts require a revised
+research review. Follow-up checks frozen approved draft attribution and current
+sent/CRM evidence, without reapplying the earlier drafting freshness window.
+
+ARR raw packets enter preflight and record-review only through stdin. Retain
+only authorized draft/selection receipts; raw rows, amounts and their hashes
+must not enter saved files or preflight output. The receipt identifies an
+authorized immutable input snapshot, not merely a query execution. Financial
+validation is marked transient and cannot be replayed from the retained files.
+Before creation, stream current input again and compare original financial
+preimages in memory or through that immutable snapshot. After session loss,
+missing original inputs require a fresh review; matching draft text alone is
+insufficient. Provider truth and consent still require the cited human evidence.
 
 ## Reviewed local configuration changes
 
@@ -45,15 +89,18 @@ inside the run and compute SHA-256. Add one frontmatter line after status:
 `expected_after: {"A1": {"_shared/claims.json": "64-character SHA-256"}}`.
 The real value is the staged file hash, not the explanatory placeholder above.
 Only named shared inputs already in the review snapshot may be changed this way.
+All changed companion files must be included in one coherent configuration
+effect. Preflight validates the full proposed factory and exact postimage hashes.
 The recorded approved IDs select which postimages are authorized. Changing a
 file to any other revision invalidates review. A landed postimage without a
 result is recovery_required: inspect what happened; never replay the write.
 
 ## 02 — apply and report
 
-First run `python3 scripts/runs.py status RUN_ID`. Continue only with a current
-review and the actual user authorization. Use the selected workflow and shared
-rules for each approved effect. Re-read live preimages and stop the affected
+First run `python3 scripts/runs.py status RUN_ID` and current preflight with its
+required source or transient input. Continue only with a current review and
+actual user authorization. Use the selected workflow and shared rules for each
+approved effect. Re-read live preimages and stop the affected
 effect if they changed. Apply through the configured host tools, then read back.
 
 Write output/{run-id}/02_result.json with recorded_at, summary, review_snapshot
@@ -73,3 +120,7 @@ Inspect only this run's declared request, review, review record and result.
 review_current, recovery_required, result_stale, incomplete or completion_recorded. The last means
 the required local record shape is complete, not independently proven service
 success. A template, stale result or unreviewed file never completes the run.
+Status checks frozen validation and hashes; elapsed time alone does not erase
+historical completion. A new effect attempt uses current preflight. Older reviews
+without the checked-input contract remain historical records but need prepared
+inputs and a fresh review before another effect or actionable handoff.

@@ -13,7 +13,16 @@ PRIVATE = {"_shared/pairings.md", "_shared/policy.json", "_shared/adapters.md", 
 
 
 def public_files(root):
-    if (root / ".git").is_dir():
+    root = Path(root).resolve()
+    try:
+        checkout = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=root, capture_output=True, text=True)
+    except FileNotFoundError:
+        if (root / ".git").exists():
+            raise ValueError("Git is required to inspect tracked files in this checkout")
+        checkout = None
+    # An exported template nested inside someone else's checkout is not that
+    # checkout. Linked worktrees have a .git file and still pass this root test.
+    if checkout is not None and checkout.returncode == 0 and Path(checkout.stdout.strip()).resolve() == root:
         proc = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=root, capture_output=True, check=True)
         return sorted({Path(p) for p in proc.stdout.decode().split("\0")
                        if p and ((root / p).exists() or (root / p).is_symlink())})

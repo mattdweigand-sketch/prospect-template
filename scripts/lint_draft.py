@@ -4,11 +4,17 @@ import json
 import re
 from pathlib import Path
 
-EMOJI = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF]")
+import factory
+
+EMOJI = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF]|[\U0001F1E6-\U0001F1FF]{2}|[0-9#*]\ufe0f?\u20e3")
+MARKDOWN = re.compile(
+    r"\*\*|`|(?m:^\s*(?:[-*+]\s+|\d+\.\s+|#{1,6}\s+|>\s*|\[[^\]\n]+\]:\s*))"
+    r"|!?\[[^\]\n]+\](?:\([^\n]*?\)|\[[^\]\n]*\])|(?<!\w)_{1,2}(?=\S)[^_\n]+_{1,2}(?!\w)")
 
 
-def check(body, rules):
+def check(body, rules, *, word_limit=True):
     """Check the phrase list, formatting rules and limits configured in policy."""
+    factory.validate_lint(rules)
     if not isinstance(body, str) or not body.strip():
         return ["body must be a nonempty string"]
     hits = []
@@ -18,13 +24,15 @@ def check(body, rules):
     for mark in rules["forbidden_punctuation"]:
         if mark in body:
             hits.append("forbidden punctuation: " + mark)
-    if len(re.findall(r"\b[\w']+\b", body)) > rules["max_body_words"]:
+    if word_limit and len(re.findall(r"\b[\w']+\b", body)) > rules["max_body_words"]:
         hits.append("body exceeds configured word limit")
     if rules["no_emoji"] and EMOJI.search(body):
         hits.append("emoji in email")
     if rules["no_hashtags"] and re.search(r"(?<!\w)#\w+", body):
         hits.append("hashtag in email")
-    if rules["no_markdown"] and ("**" in body or re.search(r"(?m)^\s*(?:[-*+]\s+|\d+\.\s+|#{1,6}\s+)", body)):
+    # Ignore punctuation inside plain URLs, while retaining surrounding link markup.
+    formatting = re.sub(r"https?://[^\s<>\[\]()`]+", "URL", body)
+    if rules["no_markdown"] and MARKDOWN.search(formatting):
         hits.append("markdown formatting in email")
     return hits
 

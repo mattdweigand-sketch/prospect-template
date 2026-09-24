@@ -1,17 +1,25 @@
 {
-  "version": 2,
+  "version": 3,
   "commands": {
     "prospect-setup": {
       "description": "Run guided setup or update a team's ICP, messaging, signal mappings and email voice from its own materials.",
       "workspace": "workflows/knowledge/CONTEXT.md",
       "workflow": "workflows/knowledge/prospect-setup.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/source_snapshot.py",
         "scripts/validate_setup.py",
         "scripts/refresh_tracks.py",
         "scripts/approval.py",
         "scripts/build_pairings.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md",
+        "_shared/icp.md",
+        "_shared/taxonomy.json",
+        "_shared/claims.json"
       ]
     },
     "signal-scan": {
@@ -19,9 +27,16 @@
       "workspace": "workflows/research/CONTEXT.md",
       "workflow": "workflows/research/signal-scan.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/evidence_gate.py",
-        "scripts/scan_verdict.py"
+        "scripts/scan_verdict.py",
+        "scripts/route_candidate.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md",
+        "_shared/taxonomy.json"
       ]
     },
     "signal-prospector": {
@@ -29,9 +44,16 @@
       "workspace": "workflows/research/CONTEXT.md",
       "workflow": "workflows/research/signal-prospector.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/evidence_gate.py",
         "scripts/route_candidate.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md",
+        "_shared/icp.md",
+        "_shared/taxonomy.json"
       ]
     },
     "signal-outreach": {
@@ -39,11 +61,20 @@
       "workspace": "workflows/outreach/CONTEXT.md",
       "workflow": "workflows/outreach/signal-outreach.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/outreach_gate.py",
         "scripts/approval.py",
         "scripts/lint_draft.py",
-        "scripts/privacy_check.py"
+        "scripts/privacy_check.py",
+        "scripts/evidence_gate.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md",
+        "_shared/icp.md",
+        "_shared/taxonomy.json",
+        "_shared/claims.json"
       ]
     },
     "signal-followup": {
@@ -51,8 +82,13 @@
       "workspace": "workflows/outreach/CONTEXT.md",
       "workflow": "workflows/outreach/signal-followup.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/followup_gate.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md"
       ]
     },
     "signal-refresh": {
@@ -60,10 +96,19 @@
       "workspace": "workflows/knowledge/CONTEXT.md",
       "workflow": "workflows/knowledge/signal-refresh.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/refresh_tracks.py",
         "scripts/approval.py",
-        "scripts/build_pairings.py"
+        "scripts/build_pairings.py",
+        "scripts/validate_setup.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md",
+        "_shared/icp.md",
+        "_shared/taxonomy.json",
+        "_shared/claims.json"
       ]
     },
     "signal-user-scan": {
@@ -71,8 +116,13 @@
       "workspace": "workflows/research/CONTEXT.md",
       "workflow": "workflows/research/signal-user-scan.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/privacy_check.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md"
       ]
     },
     "signal-arr-growth": {
@@ -80,9 +130,15 @@
       "workspace": "workflows/outreach/CONTEXT.md",
       "workflow": "workflows/outreach/signal-arr-growth.md",
       "checks": [
+        "scripts/run_checks.py",
         "scripts/factory.py",
         "scripts/arr_growth_gate.py",
         "scripts/route_candidate.py"
+      ],
+      "factory_inputs": [
+        "_shared/policy.json",
+        "_shared/adapters.md",
+        "_shared/icp.md"
       ]
     }
   }

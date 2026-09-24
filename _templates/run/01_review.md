@@ -15,4 +15,4 @@ Use a separate heading `## Effect A1` for each exact effect; omit effect heading
 Include destination, current value, complete proposed payload and supporting evidence.
 
 ## Checks and unresolved work
-Record the workflow's checks and remaining limitations. Change status only after completing the review.
+Record preflight outcomes and remaining limitations. Fill inputs.json, prepare the review, set status ready and run preflight before requesting approval.

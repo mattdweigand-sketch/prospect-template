@@ -1,7 +1,10 @@
 """Synthetic regression tests; no live services."""
 import copy
 from datetime import date
+from pathlib import Path
+import shutil
 import sys
+import tempfile
 import unittest
 
 from gate_fixtures import SCRIPTS, SHARED
@@ -80,6 +83,24 @@ class Allow(unittest.TestCase):
         out = run(row(last_touch_date="2026-08-01"))
         self.assertEqual(out["verdict"], "allow")
 
+    def test_equal_growth_uses_account_id_ties_before_cap(self):
+        rows = [row(account_id=f"account-{i}", net_change_usd=1200) for i in (1, 2, 3)]
+        self.assertEqual([r["account_id"] for r in run(*rows)["selected"]], ["account-1", "account-2"])
+        with self.assertRaisesRegex(ValueError, "then account ID"):
+            run(*reversed(rows))
+
+    def test_account_loader_does_not_require_taxonomy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            shared = Path(directory)
+            for name in ("policy.json", "icp.md"):
+                shutil.copyfile(SHARED / name, shared / name)
+            result = ag.check({"data_through_date": "2026-09-20", "rows": [row()]}, POLICY, TODAY, shared)
+            self.assertEqual(result["verdict"], "allow")
+
+    def test_canonical_email_comparison_preserves_original_recipient(self):
+        r = row(billing_email="Jane@EXAMPLE.ORG.")
+        self.assertEqual(run(r)["selected"][0]["draft"]["to"], "Jane@EXAMPLE.ORG.")
+
 
 class Hold(unittest.TestCase):
     def hold(self, r):
@@ -135,6 +156,18 @@ class Hold(unittest.TestCase):
         out = run(row(observed_dates=30))
         self.assertNotIn("draft", out["held"][0])
 
+    def test_unresolved_mapping_nulls_remain_held_without_false_duplicates(self):
+        unresolved = row(mapping_verified=False)
+        unresolved.update(organization_id=None, account_id=None)
+        unresolved["account"]["id"] = None
+        out = run(unresolved, copy.deepcopy(unresolved), row())
+        self.assertEqual(out["verdict"], "allow")
+        self.assertEqual([r["hold"] for r in out["held"]], ["ambiguous_account_mapping"] * 2)
+        self.assertEqual([r["account_id"] for r in out["selected"]], ["account-1"])
+
+    def test_unknown_count_and_source_are_an_explicit_hold(self):
+        self.assertEqual(self.hold(row(account={"headcount": None, "headcount_source": None})), "territory_unknown")
+
 
 class Input(unittest.TestCase):
     def test_missing_key(self):
@@ -144,10 +177,38 @@ class Input(unittest.TestCase):
             run(r)
 
     def test_forbidden_template_detected(self):
-        pol = copy.deepcopy(POLICY)
-        pol["arr_growth"]["email_template"]["body"] = "Your ARR is up 20%."
+        for text in ("Your ARR is up 20%.", "Your arr increased.", "Annual\nrecurring revenue increased."):
+            pol = copy.deepcopy(POLICY)
+            pol["arr_growth"]["email_template"]["body"] = text
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                ag.check({"data_through_date": "2026-09-20", "rows": [row()]}, pol, today=TODAY, shared=SHARED)
+
+    def test_malformed_records_never_become_candidates(self):
+        for changes in ({"account_id": None}, {"organization_id": None}, {"contacts": {}}, {"contacts": ""},
+                        {"contacts": [{"id": None, "email": "jane@example.org"}]}, {"net_change_usd": True},
+                        {"observed_dates": True}, {"communications_enabled": "true"},
+                        {"billing_email": "jane@example.org,bob"}):
+            r = row()
+            r.update(changes)
+            if "account_id" in changes:
+                r["account"]["id"] = changes["account_id"]
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                run(r)
+
+    def test_missing_source_and_noncanonical_dates_are_unusable(self):
+        r = row()
+        del r["account"]["headcount_source"]
+        with self.assertRaisesRegex(ValueError, "headcount_source"):
+            run(r)
+        for value in ("20260920", "2026-09-20T00:00:00Z", None):
+            with self.subTest(date=value), self.assertRaises(ValueError):
+                ag.check({"data_through_date": value, "rows": [row()]}, POLICY, TODAY, SHARED)
+
+    def test_direct_call_validates_enabled_module_configuration(self):
+        policy = copy.deepcopy(POLICY)
+        del policy["arr_growth"]["allowed_platforms"]
         with self.assertRaises(ValueError):
-            ag.check({"data_through_date": "2026-09-20", "rows": [row()]}, pol, today=TODAY, shared=SHARED)
+            ag.check({"data_through_date": "2026-09-20", "rows": [row()]}, policy, TODAY, SHARED)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import approval
 import factory
@@ -27,19 +27,26 @@ def git(source, *args):
     result = subprocess.run(["git", "-C", str(source), *args], capture_output=True, text=True)
     if result.returncode:
         raise ValueError(result.stderr.strip() or "git command failed")
-    return result.stdout.strip()
+    # NUL-delimited path output must retain exact filename bytes-as-text,
+    # including any leading/trailing spaces; Git disables path quoting with -z.
+    return result.stdout if "-z" in args else result.stdout.strip()
+
+
+def normalized_path(value):
+    """Canonical repository-relative POSIX path; empty denotes repository root."""
+    if not isinstance(value, str) or PurePosixPath(value).is_absolute() or ".." in PurePosixPath(value).parts or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise ValueError("source references must be relative paths inside the pinned repository")
+    normalized = str(PurePosixPath(value))
+    return "" if normalized == "." else normalized
 
 
 def source_path(root, ref):
-    for part in (root, ref):
-        if not isinstance(part, str) or Path(part).is_absolute() or ".." in Path(part).parts or "\n" in part or "\t" in part:
-            raise ValueError("source references must be relative paths inside the pinned repository")
-    return str(Path(root) / ref)
+    return str(PurePosixPath(normalized_path(root)) / normalized_path(ref))
 
 
 def page_at(source, revision, root, ref):
     path = source_path(root, ref)
-    tree = git(source, "ls-tree", revision, "--", path)
+    tree = git(source, "ls-tree", "-z", revision, "--", path)
     if not tree:
         return None
     if not tree.startswith("100644 blob ") and not tree.startswith("100755 blob "):
@@ -47,35 +54,34 @@ def page_at(source, revision, root, ref):
     return git(source, "show", f"{revision}:{path}")
 
 
-def verify_rows(rows, source_root):
-    """Local synthetic-fixture helper. Production reports use page_at at the pinned commit."""
-    broken, missing = [], []
-    for row in rows:
-        page = factory.relative_path(source_root, row["source_reference"])
-        if not page.is_file():
-            missing.append({"id": row["id"], "source_reference": row["source_reference"]})
-        elif not row.get("evidence") or norm(row["evidence"]) not in norm(page.read_text()):
-            broken.append({"id": row["id"], "source_reference": row["source_reference"]})
-    return broken, missing
-
-
-def changed_pages(name_status, source_root, watch_dirs, ignore_pages):
-    prefix = source_root.strip("/") + "/" if source_root else ""
+def changed_pages(name_status, source_root, watch_dirs, ignore_pages, previous=None, watch_files=()):
+    """Filter Git --name-status -z records produced with --no-renames."""
+    root = normalized_path(source_root)
+    prefix = root + "/" if root else ""
+    directories = [normalized_path(p) for p in watch_dirs]
+    ignored = {normalized_path(p) for p in ignore_pages}
+    watched = {normalized_path(p) for p in watch_files}
     out = []
-    for line in name_status.splitlines():
-        parts = line.split("\t")
-        if len(parts) < 2 or not parts[-1].startswith(prefix):
+    fields = name_status.split("\0")
+    if fields[-1] or len(fields) % 2 != 1:
+        raise ValueError("expected NUL-delimited Git status/path records")
+    for status, raw_path in zip(fields[::2], fields[1::2]):
+        if status not in ("A", "M", "D"):
             continue
-        rel = parts[-1][len(prefix):]
-        if rel not in ignore_pages and rel.split("/", 1)[0] in watch_dirs and parts[0][0] in "AM":
-            out.append({"status": "added" if parts[0][0] == "A" else "modified", "path": rel})
+        path = normalized_path(raw_path)
+        if not path.startswith(prefix):
+            continue
+        rel = path[len(prefix):]
+        if rel in watched or (rel not in ignored and any(not d or rel.startswith(d + "/") for d in directories)):
+            change = {"status": {"A": "added", "M": "modified", "D": "deleted"}[status], "path": rel}
+            if status == "D":
+                change.update(prior_revision=previous, prior_path=path)
+            out.append(change)
     return out
 
 
 def changed_watch_files(name_status, source_root, watch_files):
-    prefix = source_root.strip("/") + "/" if source_root else ""
-    return [parts[-1][len(prefix):] for line in name_status.splitlines() for parts in [line.split("\t")]
-            if len(parts) >= 2 and parts[-1].startswith(prefix) and parts[-1][len(prefix):] in watch_files]
+    return [change["path"] for change in changed_pages(name_status, source_root, [], [], watch_files=watch_files)]
 
 
 def contradiction_flags(text, rows):
@@ -124,7 +130,9 @@ def unstamped(doc, tax, fm):
 
 
 def load(shared):
-    return factory.claim_document(shared), factory.taxonomy(shared), factory.frontmatter(shared), factory.read(shared / "policy.json")["refresh"]
+    policy = factory.read(shared / "policy.json")
+    factory.validate_policy(policy, ("refresh",))
+    return factory.claim_document(shared), factory.taxonomy(shared), factory.frontmatter(shared), policy["refresh"]
 
 
 def report(source, shared=SHARED, revision="HEAD"):
@@ -132,8 +140,7 @@ def report(source, shared=SHARED, revision="HEAD"):
     head = git(source, "rev-parse", "--verify", f"{revision}^{{commit}}")
     prior = doc.get("source_revision")
     previous = git(source, "rev-parse", "--verify", f"{prior}^{{commit}}") if prior else None
-    root = doc["source_root"]
-    source_path(root, "")
+    root = normalized_path(doc["source_root"])
     broken, missing = [], []
     for row in doc["claims"]:
         text = page_at(source, head, root, row["source_reference"])
@@ -142,24 +149,21 @@ def report(source, shared=SHARED, revision="HEAD"):
         elif not row.get("evidence") or norm(row["evidence"]) not in norm(text):
             broken.append({"id": row["id"], "source_reference": row["source_reference"]})
     if previous:
-        diff = git(source, "diff", "--no-renames", "--name-status", f"{previous}..{head}", "--", root or ".")
+        diff = git(source, "diff", "--no-renames", "--name-status", "-z", f"{previous}..{head}", "--", root or ".")
     else:
-        diff = "\n".join("A\t" + p for p in git(source, "ls-tree", "--name-only", "-r", head, "--", root or ".").splitlines())
+        paths = git(source, "ls-tree", "--name-only", "-r", "-z", head, "--", root or ".")
+        diff = "".join("A\0" + p + "\0" for p in paths.split("\0") if p)
     contradiction = page_at(source, head, root, pol["contradictions_path"]) if pol.get("contradictions_path") else None
-    watched = list(dict.fromkeys(pol["watch_paths"] + [p for p in (pol.get("icp_path"), pol.get("contradictions_path")) if p]))
+    watched = list(dict.fromkeys(normalized_path(p) for p in pol["watch_paths"] + [p for p in (pol.get("icp_path"), pol.get("contradictions_path")) if p]))
     missing_watch = [ref for ref in watched if page_at(source, head, root, ref) is None]
     return {"head": head, "head_date": git(source, "show", "-s", "--format=%cs", head), "source_revision": prior,
             "unchanged": previous == head, "rows": len(doc["claims"]), "broken_rows": broken, "missing_pages": missing,
-            "changed_pages": changed_pages(diff, root, pol["watch_dirs"], pol["ignore_pages"]),
+            "changed_pages": changed_pages(diff, root, pol["watch_dirs"], pol["ignore_pages"], previous, watched),
             "changed_watch_files": changed_watch_files(diff, root, watched),
             "missing_watch_pages": missing_watch,
             "contradictions_status": "not_configured" if not pol.get("contradictions_path") else "missing" if contradiction is None else "validated",
             "contradiction_flags": contradiction_flags(contradiction, doc["claims"]) if contradiction is not None else [],
             "unstamped": unstamped(doc, tax, fm)}
-
-
-def write_tracks(doc, path):
-    factory.write(path, doc)
 
 
 def stamp(rep, shared=SHARED, today=None):

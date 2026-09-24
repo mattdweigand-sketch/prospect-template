@@ -47,6 +47,15 @@ For an existing deployment, review differences against the examples; never
 overwrite configured values with starter defaults. Configuration and run data
 remain ignored by Git.
 
+Run preparation now uses workflow-specific input paths from the wrapper registry.
+The old policy.review_inputs list is no longer used; remove it in the next
+reviewed configuration update. Also remove prospector.admission and routing's
+descriptive route strings. Their historical defaults remain accepted during
+migration, but conflicting strings are rejected because routing and admission
+are fixed code checks. routing.house_owner_ids remains configurable. Existing
+run receipts remain historical records; prepare and review the required inputs
+under the current contract before another effect or handoff.
+
 The agent uses the [questionnaire](questionnaire.md) to fill missing answers.
 Keep mode example while preparing messaging and synthetic previews; set mode
 live only after required adapters and workflow settings are

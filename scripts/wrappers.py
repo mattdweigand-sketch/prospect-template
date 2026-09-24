@@ -11,15 +11,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def load_routes(root=ROOT):
     doc = json.loads((root / "scripts/wrapper-contract.json").read_text())
-    if doc.get("version") != 2 or not isinstance(doc.get("commands"), dict):
+    if doc.get("version") != 3 or not isinstance(doc.get("commands"), dict):
         raise ValueError("invalid wrapper contract")
     for name, row in doc["commands"].items():
         if not re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name):
             raise ValueError("invalid command name: " + name)
-        if set(row) != {"description", "workspace", "workflow", "checks"}:
+        if set(row) != {"description", "workspace", "workflow", "checks", "factory_inputs"}:
             raise ValueError("invalid route fields: " + name)
         if not isinstance(row["description"], str) or not row["description"].strip():
             raise ValueError("missing description: " + name)
+        inputs = row["factory_inputs"]
+        if not isinstance(inputs, list) or not inputs or any(not isinstance(ref, str) for ref in inputs) or len(set(inputs)) != len(inputs):
+            raise ValueError("factory_inputs must name distinct configuration files")
+        allowed = {"_shared/" + name for name in ("policy.json", "adapters.md", "icp.md", "taxonomy.json", "claims.json")}
+        if not set(inputs) <= allowed or "_shared/policy.json" not in inputs:
+            raise ValueError("factory_inputs must use the canonical configuration paths")
         if not isinstance(row["checks"], list) or not row["checks"] or len(row["checks"]) != len(set(row["checks"])):
             raise ValueError("checks must name distinct helper files: " + name)
         for ref in row["checks"]:

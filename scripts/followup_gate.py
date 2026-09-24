@@ -10,6 +10,8 @@ Packet:
   contacts_complete: true; tasks_complete: true, backed by complete read receipts.
   tasks: required list of all contact tasks [{id, subject, description, status}], any status.
     An empty list means a completed lookup found none; missing/null blocks.
+    Each task needs nonblank ID/subject/status and a string description (empty is
+    allowed). An unfamiliar nonblank status is conservatively open.
   signal: {signal_type, claim_id} from the reviewed handoff; both arr_growth for
     arr_growth mode. Missing attribution is not guessed.
 
@@ -38,6 +40,7 @@ def load_policy(shared=SHARED):
 
 
 def due_date(sent_at, mode, policy):
+    factory.validate_policy(policy, ("identity", "followup_signal"))
     if mode not in ("standard", "arr_growth"):
         raise ValueError("unknown follow-up mode")
     sent = datetime.fromisoformat(sent_at.replace("Z", "+00:00"))
@@ -55,7 +58,38 @@ def due_date(sent_at, mode, policy):
     return day
 
 
+def validate_packet(packet):
+    factory.require(isinstance(packet, dict), "packet must be an object")
+    account = packet.get("account")
+    factory.require(isinstance(account, dict), "account must be an object")
+    for key in ("id", "owner_id"):
+        factory.require(factory.nonblank(account.get(key)), f"account.{key} must be a nonblank string")
+    opportunities = account.get("open_opportunity_ids")
+    factory.require(isinstance(opportunities, list) and all(factory.nonblank(v) for v in opportunities),
+                    "account.open_opportunity_ids must be a list of nonblank strings")
+    for section, keys in (("sent", ("message_id", "thread_id", "subject", "sent_at", "to")),
+                          ("contacts", ("id", "account_id", "email")), ("tasks", ("id", "subject", "status"))):
+        items = packet.get(section)
+        factory.require(isinstance(items, list), f"{section} must be an explicit list of objects")
+        for item in items:
+            factory.require(isinstance(item, dict), f"{section} entries must be objects")
+            for key in keys:
+                factory.require(factory.nonblank(item.get(key)), f"{section}.{key} must be a nonblank string")
+            if section == "tasks":
+                factory.require(isinstance(item.get("description"), str), "tasks.description must be a string")
+            else:
+                factory.email(item["to" if section == "sent" else "email"])
+    signal = packet.get("signal")
+    factory.require(signal is None or isinstance(signal, dict), "signal must be an object")
+    for key in ("signal_type", "claim_id"):
+        value = (signal or {}).get(key)
+        factory.require(value is None or isinstance(value, str), f"signal.{key} must be a string or null")
+
+
 def check(packet, mode, policy, now=None, shared=SHARED):
+    factory.validate_policy(policy, ("identity", "followup_signal"))
+    factory.require(mode in ("standard", "arr_growth"), "unknown follow-up mode")
+    validate_packet(packet)
     zone = ZoneInfo(policy["identity"]["timezone"])
     now = now or datetime.now(zone)
     if now.tzinfo is None:
@@ -63,12 +97,10 @@ def check(packet, mode, policy, now=None, shared=SHARED):
     today = now.astimezone(zone).date()
     fp = policy["followup_signal"]
     reasons = []
-    if packet.get("tasks_complete") is not True or packet.get("contacts_complete") is not True or not packet.get("sent_lookup_reference"):
+    if packet.get("tasks_complete") is not True or packet.get("contacts_complete") is not True or not factory.nonblank(packet.get("sent_lookup_reference")):
         reasons.append("complete contact/task reads and live sent-mail reference are required")
-    tasks = packet.get("tasks")
-    if not isinstance(tasks, list) or any(not isinstance(task, dict) for task in tasks):
-        return {"verdict": "block", "reasons": reasons + ["tasks must be an explicit list of task objects"]}
-    sent = packet.get("sent") or []
+    tasks = packet["tasks"]
+    sent = packet["sent"]
     if len(sent) == 0:
         return {"verdict": "block", "reasons": ["no sent proof"]}
     if len(sent) > 1:
@@ -86,19 +118,15 @@ def check(packet, mode, policy, now=None, shared=SHARED):
         tracks = {t["id"] for t in factory.claim_document(shared)["claims"]}
         if track not in tracks:
             reasons.append(f"claim_id not in claims.json: {track}")
-    for k in ("message_id", "thread_id", "subject", "sent_at", "to"):
-        if not s.get(k):
-            return {"verdict": "block", "reasons": [f"sent hit missing {k}"]}
-
     if packet.get("account", {}).get("owner_id") != policy["identity"]["owner_id"]:
         reasons.append("account owner is not identity.owner_id")
     if packet.get("account", {}).get("open_opportunity_ids") != []:
         reasons.append("account must have a verified empty open-opportunity list")
 
-    contacts = packet.get("contacts") or []
+    contacts = packet["contacts"]
     if len(contacts) != 1:
         reasons.append(f"contact match count {len(contacts)}, need exactly 1")
-    elif (contacts[0].get("email") or "").lower() != s["to"].lower():
+    elif factory.email(contacts[0]["email"]) != factory.email(s["to"]):
         reasons.append("contact email does not equal recipient")
     elif contacts[0].get("account_id") != packet["account"].get("id") or not contacts[0].get("id"):
         reasons.append("contact must belong to the resolved account")
@@ -106,9 +134,9 @@ def check(packet, mode, policy, now=None, shared=SHARED):
     subject = fp["task"]["subject"].format(mail_subject=s["subject"])
     prefix = fp["task"]["subject"].split("{")[0].strip()
     for t in tasks:
-        subj = t.get("subject") or ""
-        is_open = (t.get("status") or "") not in fp["closed_statuses"]
-        if subj == subject or s["message_id"] in (t.get("description") or ""):
+        subj = t["subject"]
+        is_open = t["status"] not in fp["closed_statuses"]
+        if subj == subject or s["message_id"] in t["description"]:
             reasons.append(f"duplicate Task {t.get('id')}")
             break
         if is_open and subj.startswith(prefix):

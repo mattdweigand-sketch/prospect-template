@@ -12,12 +12,15 @@ daily_coverage_verified, mapping_verified, contacts_complete, activity_complete.
 account: {id, exists, name, owner_id, owner_is_active, open_opportunity_ids,
           headcount, headcount_source}.
 contacts: zero/one exact-email matches [{id, email, first_name}].
+Eligible IDs are nonblank strings. Explicitly unresolved mapping IDs may be null
+only when mapping is unverified or no CRM account exists; those rows stay held.
 last_touch_date: most recent suppressing account-wide CRM/mail date or null only
 after complete reads. Query and live-read receipts substantiate the true flags.
 
 Checks adapter enabled, completed data date, coverage, finite consistent positive
 ARR change, unique mapping, route, territory, billing permission, contact match,
-suppression, rank and cap. The configured template's body/subject may not contain
+suppression, descending growth/account-ID order and cap. Equal-growth account IDs
+use case-sensitive string order. The configured template's body/subject may not contain
 amounts, percentages, digits or ARR language; the greeting is separately rendered.
 No connectors or writes. Exit 0 selected candidates, 1 none, 2 unusable input.
 """
@@ -36,9 +39,9 @@ import factory
 HERE = Path(__file__).resolve().parent
 SHARED = HERE.parent / "_shared"
 sys.path.insert(0, str(HERE))
-from route_candidate import load_rules, route, territory  # noqa: E402
+from route_candidate import load_account_rules, route, territory  # noqa: E402
 
-FORBIDDEN = re.compile(r"[$%]|\bARR\b|\d")
+FORBIDDEN = re.compile(r"[$%]|\bARR\b|\bannual\s+recurring\s+revenue\b|\d", re.I)
 ROW_KEYS = {"organization_id", "organization_name", "account_id", "baseline_arr_usd", "current_arr_usd",
             "net_change_usd", "observed_dates", "required_dates", "subscription_platform", "billing_email",
             "communications_enabled", "account", "contacts", "last_touch_date"}
@@ -46,6 +49,59 @@ ROW_KEYS = {"organization_id", "organization_name", "account_id", "baseline_arr_
 
 def load_policy(shared=SHARED):
     return factory.read(shared / "policy.json")
+
+
+def checked_date(value, field):
+    factory.require(isinstance(value, str), f"{field} must be YYYY-MM-DD")
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        raise ValueError(f"{field} must be YYYY-MM-DD") from None
+    factory.require(parsed.isoformat() == value, f"{field} must be YYYY-MM-DD")
+    return parsed
+
+
+def validate_row(r):
+    factory.require(isinstance(r, dict), "billing row must be an object")
+    missing = sorted(ROW_KEYS - set(r))
+    factory.require(not missing, f"billing row missing keys: {missing}")
+    a = r["account"]
+    factory.require(isinstance(a, dict), "account must be an object")
+    for key in ("id", "exists", "name", "owner_id", "owner_is_active", "open_opportunity_ids", "headcount", "headcount_source"):
+        factory.require(key in a, f"account.{key} is required")
+    factory.require(type(a["exists"]) is bool, "account.exists must be boolean")
+    for key in ("mapping_verified", "daily_coverage_verified", "activity_complete", "contacts_complete"):
+        factory.require(r.get(key) is None or type(r[key]) is bool, f"{key} must be boolean or null")
+    unresolved = r.get("mapping_verified") is not True or not a["exists"]
+    for label, value in (("organization_id", r["organization_id"]), ("account_id", r["account_id"]), ("account.id", a["id"])):
+        factory.require(factory.nonblank(value) or (unresolved and value is None), f"{label} must be a nonblank string; null requires an unresolved mapping")
+    factory.require(factory.nonblank(r["organization_name"]), "organization_name must be a nonblank string")
+    for key in ("name", "owner_id"):
+        factory.require(factory.nonblank(a[key]) or (unresolved and a[key] is None), f"account.{key} must be a nonblank string or unresolved null")
+    factory.require(type(a["owner_is_active"]) is bool or (unresolved and a["owner_is_active"] is None), "account.owner_is_active must be boolean or unresolved null")
+    factory.require(isinstance(a["open_opportunity_ids"], list) and all(factory.nonblank(v) for v in a["open_opportunity_ids"]),
+                    "account.open_opportunity_ids must be a list of nonblank strings")
+    factory.require(a["headcount"] is None or (type(a["headcount"]) is int and a["headcount"] >= 0), "account.headcount must be a nonnegative integer or null")
+    factory.require(factory.nonblank(a["headcount_source"]) or (a["headcount"] is None and a["headcount_source"] is None),
+                    "account.headcount_source must identify the populated count, or be null for an unknown count")
+    for key in ("baseline_arr_usd", "current_arr_usd", "net_change_usd"):
+        factory.require(type(r[key]) in (int, float), f"{key} must be numeric")
+    for key in ("observed_dates", "required_dates"):
+        factory.require(type(r[key]) is int and r[key] >= 0, f"{key} must be a nonnegative integer")
+    factory.require(r["communications_enabled"] is None or type(r["communications_enabled"]) is bool,
+                    "communications_enabled must be boolean or null")
+    factory.require(r["subscription_platform"] is None or factory.nonblank(r["subscription_platform"]), "subscription_platform must be a nonblank string or null")
+    factory.require(r["billing_email"] is None or isinstance(r["billing_email"], str), "billing_email must be a string or null")
+    if r["billing_email"]:
+        factory.email(r["billing_email"])
+    factory.require(isinstance(r["contacts"], list), "contacts must be a list")
+    for contact in r["contacts"]:
+        factory.require(isinstance(contact, dict), "contacts entries must be objects")
+        factory.require(factory.nonblank(contact.get("id")), "contacts.id must be a nonblank string")
+        factory.email(contact.get("email"))
+        factory.require(contact.get("first_name") is None or isinstance(contact["first_name"], str), "contacts.first_name must be a string or null")
+    if r["last_touch_date"] is not None:
+        checked_date(r["last_touch_date"], "last_touch_date")
 
 
 def hold_reason(r, rules, pol, today):
@@ -58,7 +114,7 @@ def hold_reason(r, rules, pol, today):
     if r["net_change_usd"] <= 0:
         return "no_positive_net_change"
     a = r["account"]
-    if r.get("mapping_verified") is not True or a.get("id") != r["account_id"]:
+    if r.get("mapping_verified") is not True or not r["organization_id"] or not r["account_id"] or a.get("id") != r["account_id"]:
         return "ambiguous_account_mapping"
     if r.get("activity_complete") is not True or r.get("contacts_complete") is not True:
         return "incomplete_live_reads"
@@ -75,8 +131,6 @@ def hold_reason(r, rules, pol, today):
         return f"territory_{t}"
     if not r["billing_email"]:
         return "billing_email_missing"
-    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", r["billing_email"]):
-        return "billing_email_invalid"
     if r["subscription_platform"] not in pol["allowed_platforms"]:
         return "unsupported_billing_platform"
     if r["communications_enabled"] is not True:
@@ -84,7 +138,7 @@ def hold_reason(r, rules, pol, today):
     if len(r["contacts"]) > 1:
         return "ambiguous_contact"
     for c in r["contacts"]:
-        if (c.get("email") or "").lower() != r["billing_email"].lower():
+        if factory.email(c["email"]) != factory.email(r["billing_email"]):
             return "contact_email_mismatch"
     if r["last_touch_date"]:
         if date.fromisoformat(r["last_touch_date"]) >= today - timedelta(days=pol["suppression_days"]):
@@ -106,34 +160,38 @@ def build_draft(r, pol):
 
 
 def check(packet, policy, today=None, shared=SHARED):
+    factory.validate_policy(policy, ("identity", "arr_growth", "routing"))
     if not isinstance(packet, dict):
         raise ValueError("packet must be an object")
     pol = policy["arr_growth"]
     if pol["enabled"] is not True:
         return {"verdict": "block", "reasons": ["billing adapter disabled"]}
-    rules = load_rules(shared)
+    rules = load_account_rules(shared)
     today = today or datetime.now(ZoneInfo(policy["identity"]["timezone"])).date()
-    if date.fromisoformat(packet["data_through_date"]) != today - timedelta(days=pol["data_lag_days"]):
+    if checked_date(packet.get("data_through_date"), "data_through_date") != today - timedelta(days=pol["data_lag_days"]):
         return {"verdict": "block", "reasons": ["data_through_date is not the configured complete data date"]}
     rows = packet.get("rows")
     if not isinstance(rows, list):
         raise ValueError("rows must be a list")
     selected, held = [], []
-    if any(not isinstance(r, dict) for r in rows):
-        raise ValueError("each billing row must be an object")
-    account_counts = Counter(r.get("account_id") for r in rows)
-    org_counts = Counter(r.get("organization_id") for r in rows)
+    for r in rows:
+        validate_row(r)
+    account_counts = Counter(r["account_id"] for r in rows if r["account_id"] is not None)
+    org_counts = Counter(r["organization_id"] for r in rows if r["organization_id"] is not None)
     previous_growth = float("inf")
+    previous_id = None
     for i, r in enumerate(rows, 1):
-        missing = sorted(ROW_KEYS - set(r))
-        if missing:
-            raise ValueError(f"row {i} missing keys: {missing}")
         reason = hold_reason(r, rules, pol, today)
         if account_counts[r["account_id"]] > 1 or org_counts[r["organization_id"]] > 1:
             reason = "duplicate_account_mapping"
         if type(r["net_change_usd"]) in (int, float) and math.isfinite(r["net_change_usd"]):
-            if r["net_change_usd"] > previous_growth:
-                raise ValueError("billing rows must be ranked by descending net growth")
+            account_id = r["account_id"] if r.get("mapping_verified") is True and r["account"]["exists"] else None
+            if r["net_change_usd"] > previous_growth or (r["net_change_usd"] == previous_growth and account_id is not None and previous_id is not None and account_id < previous_id):
+                raise ValueError("billing rows must be ranked by descending net growth, then account ID")
+            if r["net_change_usd"] != previous_growth:
+                previous_id = None
+            if account_id is not None:
+                previous_id = account_id
             previous_growth = r["net_change_usd"]
         entry = {"rank": i, "account_id": r["account_id"], "account_name": r["account"].get("name") or r["organization_name"],
                  "net_change_usd": r["net_change_usd"], "baseline_arr_usd": r["baseline_arr_usd"], "current_arr_usd": r["current_arr_usd"]}

@@ -22,7 +22,7 @@ BASE = {
               "sent_at": "2026-09-21T14:05:00-07:00", "to": "louis@example.org"}],
     "account": {"id": "account-1", "owner_id": OWNER, "open_opportunity_ids": []},
     "contacts": [{"id": "contact-1", "email": "Louis@Example.org", "account_id": "account-1"}],
-    "tasks": [{"id": "00T1", "subject": "LinkedIn - Connected", "description": ""}],
+    "tasks": [{"id": "00T1", "subject": "LinkedIn - Connected", "description": "", "status": "Completed"}],
     "signal": {"signal_type": "operations_leader_appointment", "claim_id": "report_delivery"},
 }
 
@@ -128,15 +128,40 @@ class DueDate(unittest.TestCase):
 
 
 class Block(unittest.TestCase):
-    def test_missing_or_malformed_task_list_blocks_despite_complete_flag(self):
+    def test_missing_or_malformed_task_list_is_unusable_despite_complete_flag(self):
         missing = copy.deepcopy(BASE)
         missing.pop("tasks")
         cases = [missing] + [{**BASE, "tasks": value} for value in (None, False, {}, "", [None], ["task"])]
         for packet in cases:
-            with self.subTest(tasks=packet.get("tasks", "missing")):
-                result = fg.check(packet, "standard", POLICY, NOW, SHARED)
-                self.assertEqual(result["verdict"], "block")
-                self.assertIn("tasks must be an explicit list of task objects", result["reasons"])
+            with self.subTest(tasks=packet.get("tasks", "missing")), self.assertRaises(ValueError):
+                fg.check(packet, "standard", POLICY, NOW, SHARED)
+
+    def test_incomplete_task_objects_never_bypass_duplicate_check(self):
+        task = {"id": "task-1", "subject": "Follow up: buyer", "status": "Queued", "description": ""}
+        cases = [{}] + [{k: v for k, v in task.items() if k != missing} for missing in task]
+        for invalid in cases:
+            with self.subTest(task=invalid), self.assertRaises(ValueError):
+                run(tasks=[invalid])
+
+    def test_unknown_nonblank_status_is_conservatively_open(self):
+        out = run(tasks=[{"id": "task-1", "subject": "Follow up: buyer", "status": "Provider-specific", "description": ""}])
+        self.assertEqual(out["reasons"], ["open follow-up Task already exists task-1"])
+
+    def test_null_identity_and_malformed_addresses_are_unusable(self):
+        for section, key, value in (("account", "id", None), ("account", "owner_id", " "),
+                                    ("contacts", "id", None), ("contacts", "account_id", None),
+                                    ("contacts", "email", "bad"), ("sent", "to", "a@example.org,bob")):
+            packet = copy.deepcopy(BASE)
+            target = packet[section] if section == "account" else packet[section][0]
+            target[key] = value
+            with self.subTest(section=section, key=key), self.assertRaises(ValueError):
+                fg.check(packet, "standard", POLICY, NOW, SHARED)
+
+    def test_direct_call_validates_configuration(self):
+        policy = copy.deepcopy(POLICY)
+        del policy["followup_signal"]["closed_statuses"]
+        with self.assertRaises(ValueError):
+            fg.check(BASE, "standard", policy, NOW, SHARED)
 
     def test_explicit_empty_task_list_allows(self):
         self.assertEqual(run(tasks=[])["verdict"], "allow")
@@ -152,7 +177,8 @@ class Block(unittest.TestCase):
     def test_missing_field(self):
         p = copy.deepcopy(BASE)
         del p["sent"][0]["thread_id"]
-        self.assertEqual(fg.check(p, "standard", POLICY, now=NOW, shared=SHARED)["reasons"], ["sent hit missing thread_id"])
+        with self.assertRaisesRegex(ValueError, "sent.thread_id"):
+            fg.check(p, "standard", POLICY, now=NOW, shared=SHARED)
 
     def test_wrong_owner(self):
         out = run(account={"id": "account-1", "owner_id": "other-owner", "open_opportunity_ids": []})
@@ -166,15 +192,15 @@ class Block(unittest.TestCase):
         self.assertIn("contact match count 2, need exactly 1", run(contacts=[c, dict(c, id="contact-2")])["reasons"])
 
     def test_contact_email_mismatch(self):
-        out = run(contacts=[{"id": "contact-1", "email": "other@example.org"}])
+        out = run(contacts=[{"id": "contact-1", "account_id": "account-1", "email": "other@example.org"}])
         self.assertIn("contact email does not equal recipient", out["reasons"])
 
     def test_duplicate_by_subject(self):
-        out = run(tasks=[{"id": "00T9", "subject": "Follow up: Context engineering inside Example Account", "description": ""}])
+        out = run(tasks=[{"id": "00T9", "subject": "Follow up: Context engineering inside Example Account", "description": "", "status": "Completed"}])
         self.assertEqual(out["reasons"], ["duplicate Task 00T9"])
 
     def test_duplicate_by_message_id(self):
-        out = run(tasks=[{"id": "00T8", "subject": "anything", "description": "Mail message m1; thread t1."}])
+        out = run(tasks=[{"id": "00T8", "subject": "anything", "description": "Mail message m1; thread t1.", "status": "Completed"}])
         self.assertEqual(out["reasons"], ["duplicate Task 00T8"])
 
     def test_open_followup_task_blocks(self):

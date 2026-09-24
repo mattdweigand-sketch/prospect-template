@@ -20,8 +20,8 @@ statement, appear in body, and use the current completed data date.
 
 Checks a nonblank pick_reason, current claim/signal/persona stamps,
 held/status/claim boundaries, elapsed fetch age and signal freshness,
-verified recipient/title, suppression, numbers,
-proof names, copied evidence and cold-email lint. Matrix flags warn by default;
+verified recipient/title, suppression, subject/body numbers and proof names,
+body evidence copying and cold-email surface lint. Matrix flags warn by default;
 fit_mode=block holds them. Meaning, voice, truthful receipts and exact human
 approval are reviewed in workflows/outreach/signal-outreach.md.
 Exit 0 allow; 1 block with reasons and flags; 2 unusable input. JSON stdout.
@@ -54,7 +54,12 @@ def norm(t):
 
 
 def d(s):
-    return date.fromisoformat(s[:10])
+    if not isinstance(s, str):
+        raise ValueError("activity/published date must be YYYY-MM-DD")
+    value = date.fromisoformat(s)
+    if value.isoformat() != s:
+        raise ValueError("activity/published date must be YYYY-MM-DD")
+    return value
 
 
 def parse_checked(s):
@@ -102,22 +107,49 @@ def evidence_runs(evidence, body, n=EVIDENCE_RUN):
     return [" ".join(b[i:i + n]) for i in range(len(b) - n + 1) if " ".join(b[i:i + n]) in runs]
 
 
+def validate_packet(p):
+    factory.require(isinstance(p, dict), "packet must be an object")
+    for section, keys in (("bundle", ("account_name", "account_domain", "signal_type", "published_date", "quote")),
+                          ("claim", ("id", "evidence")), ("recipient", ("name", "email", "source")),
+                          ("draft", ("subject", "body"))):
+        value = p.get(section)
+        factory.require(isinstance(value, dict), f"{section} must be an object")
+        for key in keys:
+            factory.require(factory.nonblank(value.get(key)), f"{section}.{key} must be a nonblank string")
+    factory.domain(p["bundle"]["account_domain"])
+    factory.email(p["recipient"]["email"])
+    d(p["bundle"]["published_date"])
+    for section, keys in (("bundle", ("evidence_subject", "vertical")), ("claim", ("persona",)),
+                          ("recipient", ("title", "title_override"))):
+        for key in keys:
+            value = p[section].get(key)
+            factory.require(value is None or isinstance(value, str), f"{section}.{key} must be a string or null")
+    activity = p.get("activity")
+    factory.require(isinstance(activity, list), "activity must be a complete list of normalized records")
+    for item in activity:
+        factory.require(isinstance(item, dict), "activity entries must be objects")
+        factory.require(item.get("kind") in ("task", "event", "mail_sent"), "unrecognized activity kind; normalize the complete provider read")
+        d(item.get("date"))
+    sentence = p.get("adoption_sentence")
+    factory.require(sentence is None or factory.nonblank(sentence), "adoption_sentence must be a nonblank string or null")
+
+
 def check(p, pol, shared, now):
+    full_policy = factory.read(shared / "policy.json")
+    full_policy["outreach"] = pol
+    factory.validate_policy(full_policy, ("identity", "outreach"))
+    validate_packet(p)
     if now.tzinfo is None:
         raise ValueError("now must have a timezone")
     reasons = []
-    today = now.astimezone(ZoneInfo(factory.read(shared / "policy.json")["identity"]["timezone"])).date()
+    today = now.astimezone(ZoneInfo(full_policy["identity"]["timezone"])).date()
     b, tt, rc, act, dr = p["bundle"], p["claim"], p["recipient"], p["activity"], p["draft"]
     if b.get("gate") != "evidence_gate" or not b.get("quote"):
         reasons.append("a qualified evidence bundle is required")
-    if not isinstance(act, list) or any(not isinstance(a, dict) for a in act):
-        raise ValueError("activity must be a complete list of normalized records")
     if p.get("activity_complete") is not True:
         reasons.append("complete CRM and sent-mail activity reads are required")
     if not isinstance(p.get("voice_anchor_reference"), str) or not p["voice_anchor_reference"].strip():
         reasons.append("an approved email voice anchor reference is required")
-    if not isinstance(dr.get("body"), str) or not dr["body"].strip() or not isinstance(dr.get("subject"), str) or not dr["subject"].strip():
-        raise ValueError("draft subject and body must be nonempty strings")
     tt_doc = factory.claim_document(shared)
     tracks = {t["id"]: t for t in tt_doc["claims"]}
     held = set((tt_doc).get("held") or [])
@@ -167,44 +199,45 @@ def check(p, pol, shared, now):
         if not approval.stamp_current(row, row.get(approval.STAMP_KEY)):
             reasons.append(f"claim {tt['id']} changed since its approval stamp or has none")
         allowed = numbers(row.get("claim")) | numbers(row.get("track")) | numbers(b.get("quote"))
-        stray = sorted(numbers(strip_invite_minutes(body)) - allowed)
-        if stray:
-            reasons.append(f"numbers in body not in the row's claim or track or the bundle quote: {', '.join(stray)}")
+        for field, text in (("body", strip_invite_minutes(body)), ("subject", subj)):
+            stray = sorted(numbers(text) - allowed)
+            if stray:
+                reasons.append(f"numbers in {field} not in the row's claim or track or the bundle quote: {', '.join(stray)}")
         runs = evidence_runs(row["evidence"], body)
         if runs:
             reasons.append(f"body copies {EVIDENCE_RUN} or more words from the row's evidence: {runs[0]!r}")
     subject_name = norm(b.get("evidence_subject") or "")
     prospect_name = norm(b.get("account_name") or "")
     nb = norm(body)
+    proof = (row or {}).get("proof") or {}
+    permitted_name = norm(proof.get("name") or "") if proof.get("external_ok") is True else ""
     for r in tt_doc["claims"]:
         name = norm(((r.get("proof") or {}).get("name")) or "")
-        if not name or name in (subject_name, prospect_name) or name not in nb:
+        if not name or name in (subject_name, prospect_name, permitted_name):
             continue
-        ok = row is not None and r["id"] == row["id"] and bool(row["proof"].get("external_ok"))
-        if not ok:
-            reasons.append(f"body names {r['proof']['name']} from row {r['id']} proof. Only the chosen row's proof with external_ok true may be named")
+        for field, text in (("body", nb), ("subject", norm(subj))):
+            if name in text:
+                reasons.append(f"{field} names {r['proof']['name']} from row {r['id']} proof. Only the chosen row's proof with external_ok true may be named")
     title = (rc.get("title") or "").strip()
     override = rc.get("title_override")
     if stype:
-        tl = title.lower()
-        hit = tl and any(tl in x.lower() or x.lower() in tl for x in stype["target_titles"])
+        tl = norm(title)
+        hit = tl and any(re.search(r"(?<!\w)" + re.escape(norm(x)) + r"(?!\w)", tl)
+                         for x in stype["target_titles"] if norm(x) != "the quoted executive")
         quoted = "the quoted executive" in [x.lower() for x in stype["target_titles"]]
         if quoted and norm(rc.get("name") or "") and norm(rc.get("name") or "") == subject_name:
             hit = True
         if not hit and not (isinstance(override, str) and override.strip()):
             reasons.append(f"recipient title {title or '(none)'!r} outside target_titles for {b['signal_type']}. Needs title_override from the reviewer")
-    if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", rc["email"]):
-        reasons.append("recipient email is malformed")
-    dom = rc["email"].rsplit("@", 1)[-1].lower()
-    if dom != b["account_domain"].lower() and not dom.endswith("." + b["account_domain"].lower()):
+    dom = factory.email(rc["email"]).rsplit("@", 1)[-1]
+    account_domain = factory.domain(b["account_domain"])
+    if dom != account_domain and not dom.endswith("." + account_domain):
         reasons.append("recipient domain does not match bundle account_domain")
     if rc["source"] not in pol["recipient_sources"]:
         reasons.append("recipient source not in policy. Needs the reviewer to name the address")
     cutoff = today - timedelta(days=pol["suppression_days"])
     status_map = factory.task_status_map(pol)
     for a in act:
-        if a.get("kind") not in ("task", "event", "mail_sent"):
-            raise ValueError("unrecognized activity kind; normalize the complete provider read")
         state = None
         if a["kind"] == "task":
             if not isinstance(a.get("status"), str) or a["status"] not in status_map:
@@ -226,6 +259,7 @@ def check(p, pol, shared, now):
     if body.count("?") != 1:
         reasons.append(f"body has {body.count('?')} question marks, needs exactly one")
     reasons.extend(lint_draft.check(body, pol["lint"]))
+    reasons.extend("subject: " + hit for hit in lint_draft.check(subj, pol["lint"], word_limit=False))
     if pol["fit_mode"] not in ("warn", "block"):
         raise ValueError("fit_mode must be warn or block")
     if pol["fit_mode"] == "block":
@@ -233,20 +267,21 @@ def check(p, pol, shared, now):
     # This field makes an adoption assertion explicit; meaning still requires review.
     sentence = p.get("adoption_sentence")
     if sentence:
-        full_policy = factory.read(shared / "policy.json")
+        factory.validate_policy(full_policy, ("adoption",))
         bundle = p.get("adoption_bundle")
         if not isinstance(bundle, dict):
             reasons.append("adoption sentence needs a reviewed bundle")
         else:
             reasons.extend(privacy_check.check(bundle, full_policy["adoption"]["bundle_keys"]))
-            if bundle.get("account_domain", "").lower() != b["account_domain"].lower():
+            if factory.domain(bundle.get("account_domain", "")) != account_domain:
                 reasons.append("adoption bundle is for a different account")
-            permitted = full_policy["adoption"]["approved_statements"].get(bundle.get("adoption"))
+            category = bundle.get("adoption")
+            permitted = full_policy["adoption"]["approved_statements"].get(category) if category in ("org_adopted", "individuals_only") else None
             if full_policy["adoption"]["enabled"] is not True:
                 reasons.append("adoption adapter disabled")
             if bundle.get("data_through_date") != (today - timedelta(days=full_policy["adoption"]["data_lag_days"])).isoformat():
                 reasons.append("adoption bundle is not for the configured complete data date")
-            if not permitted or sentence != permitted or sentence not in body or not p.get("adoption_review_reference"):
+            if not permitted or sentence != permitted or sentence not in body or not factory.nonblank(p.get("adoption_review_reference")):
                 reasons.append("adoption sentence must equal the reviewed category statement")
             if not p.get("adoption_checked_at") or parse_checked(p["adoption_checked_at"]) is None:
                 reasons.append("adoption source needs a fresh checked_at")

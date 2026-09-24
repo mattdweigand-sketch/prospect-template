@@ -8,6 +8,7 @@ Python 3.9+ standard library only; factory configuration uses canonical JSON.
 |---|---|
 | wrappers.py | Generate/check root/family routers and thin skill/command pointers |
 | runs.py | Copy a run starter, record an actual review reference, inspect review/result state |
+| run_checks.py | Validate one run's fixed input manifest with its complete workflow gates |
 | evidence_gate.py | Match full-page quote, attribution and dated evidence; preserve actual fetch timestamp |
 | scan_verdict.py | Pick newest qualified Tier 1, else Tier 2, preserving report-order ties |
 | route_candidate.py | Distinct-type admission, territory/disqualifiers, ownership/open-deal routing |
@@ -21,7 +22,7 @@ Python 3.9+ standard library only; factory configuration uses canonical JSON.
 | validate_setup.py | Check deployed/proposed ICP, bindings, approvals, voice and pinned source evidence |
 | build_pairings.py | Rebuild ignored pairings.md; reject unknown/unreachable claim bindings |
 | approval.py | Detect changed approved content units; never grant authorization |
-| factory.py | Read canonical JSON files, ICP frontmatter and safe relative paths |
+| factory.py | Read canonical factory files; validate selected policy sections and comparison identities |
 | check_repo.py | Links, routes, public-template hygiene and example contract checks |
 
 Outputs: JSON on stdout for gates; explicitly requested generated wrappers,
