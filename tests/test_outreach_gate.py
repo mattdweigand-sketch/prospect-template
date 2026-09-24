@@ -23,17 +23,17 @@ PT = timezone(timedelta(hours=-7))
 NOW = datetime(2026, 9, 22, 14, 0, tzinfo=PT)
 PACKET = {
     "activity_complete": True, "voice_anchor_reference": "synthetic-approved-email",
-    "bundle": {"gate": "evidence_gate", "account_name": "Acme", "account_domain": "example.org", "signal_type": "ai_exec_appointment", "vertical": None,
+    "bundle": {"gate": "evidence_gate", "account_name": "Acme", "account_domain": "example.org", "signal_type": "operations_leader_appointment", "vertical": None,
                "published_date": "2026-09-10", "checked_on": "2026-09-22", "checked_at": "2026-09-22T13:30:00-07:00",
-               "quote": "Acme has appointed Jane Doe as Chief AI Officer to lead enterprise AI."},
-    "claim": {"id": "adoption_scaffolding", "evidence": ROWS["adoption_scaffolding"]["evidence"], "persona": "ai_owner",
-              "pick_reason": "The quote names a new enterprise AI lead whose tooling review can assess the claim's report export capability."},
+               "quote": "Acme has appointed Jane Doe as Chief Operating Officer to lead business operations."},
+    "claim": {"id": "report_setup", "evidence": ROWS["report_setup"]["evidence"], "persona": "operations_owner",
+              "pick_reason": "The quote names a new business operations lead whose tooling review can assess the claim's report export capability."},
     "recipient": {"email": "jane.doe@example.org", "name": "Jane Doe", "source": "existing CRM Contact",
-                  "title": "Chief AI Officer", "title_override": None},
+                  "title": "Chief Operating Officer", "title_override": None},
     "activity": [{"kind": "task", "subtype": "Email", "date": "2026-06-01", "status": "Completed", "subject": "old email"},
                  {"kind": "task", "subtype": "Task", "date": "2026-09-17", "status": "Completed", "subject": "LinkedIn - Connected"}],
-    "draft": {"subject": "Chief AI Officer, first quarter",
-              "body": "You named Jane Doe Chief AI Officer last week.\n\nThat usually creates a tooling review. Access alone rarely drives use, so plan for repetition and visible examples early.\n\nWorth a 20 minute call?"},
+    "draft": {"subject": "Chief Operating Officer, first quarter",
+              "body": "You named Jane Doe Chief Operating Officer last week.\n\nThat usually creates a tooling review. Access alone rarely drives use, so plan for repetition and visible examples early.\n\nWorth a 20 minute call?"},
 }
 
 
@@ -48,7 +48,7 @@ def pk(**changes):
 def row_packet(rid, signal_type, vertical=None, persona=None, title=None):
     r = ROWS[rid]
     return pk(bundle__signal_type=signal_type, bundle__vertical=vertical, claim__id=rid, claim__evidence=r["evidence"],
-              claim__persona=persona or r["personas"][0], recipient__title=title or "Head of AI")
+              claim__persona=persona or r["personas"][0], recipient__title=title or "Head of Operations")
 
 
 def shared_copy(mutate):
@@ -98,6 +98,30 @@ class OutreachGateTests(unittest.TestCase):
     def test_clean_packet_allows(self):
         self.assertEqual(self.check(PACKET), [])
 
+    def test_provider_task_statuses_use_explicit_mapping(self):
+        policy = copy.deepcopy(POL)
+        policy["task_status_map"] = {"Done": "completed", "Fertig": "completed", "Queued": "open", "Abandoned": "cancelled"}
+        packet = pk()
+        for native, suppressed in (("Done", True), ("Fertig", True), ("Queued", False), ("Abandoned", False)):
+            with self.subTest(status=native):
+                packet["activity"] = [{"kind": "task", "status": native, "subtype": "Email", "date": NOW.date().isoformat()}]
+                reasons = og.check(packet, policy, SHARED, NOW)
+                self.assertEqual(any("suppressed:" in reason for reason in reasons), suppressed)
+
+    def test_unknown_missing_or_invalid_status_mapping_stops_check(self):
+        packet = pk()
+        policy = copy.deepcopy(POL)
+        policy["task_status_map"] = {"Done": "completed"}
+        for status in ("Completed", "unknown", "", None, True, []):
+            packet["activity"] = [{"kind": "task", "status": status, "subtype": "Email", "date": NOW.date().isoformat()}]
+            with self.subTest(status=status), self.assertRaises(ValueError):
+                og.check(packet, policy, SHARED, NOW)
+        packet["activity"][0]["status"] = "Done"
+        for mapping in ({}, None, {"Done": "probably"}, {"Done": False}):
+            policy["task_status_map"] = mapping
+            with self.subTest(mapping=mapping), self.assertRaises(ValueError):
+                og.check(packet, policy, SHARED, NOW)
+
     def test_private_signal_cannot_replace_public_outreach_evidence(self):
         packet = pk(bundle__signal_type="paid_individuals_present", bundle__published_date=NOW.date().isoformat())
         self.assertBlocks(packet, "bundle signal_type must use a web source")
@@ -107,7 +131,7 @@ class OutreachGateTests(unittest.TestCase):
             d = shared_copy(lambda d: None)
             try:
                 tax = factory.read(d / "taxonomy.json")
-                signal = next(s for s in tax["signals"] if s["id"] == "ai_exec_appointment")
+                signal = next(s for s in tax["signals"] if s["id"] == "operations_leader_appointment")
                 signal["source"] = source
                 signal["approved"] = approval.make_stamp(signal, "2026-09-22")
                 factory.write(d / "taxonomy.json", tax)
@@ -118,13 +142,13 @@ class OutreachGateTests(unittest.TestCase):
 
     # freshness
     def test_published_date_freshness_is_per_signal_type(self):
-        self.assertEqual(self.check(pk(bundle__published_date="2026-06-24")), [])  # 90 days, ai_exec_appointment allows 90
-        self.assertBlocks(pk(bundle__published_date="2026-06-23"), "91 days old, ai_exec_appointment freshness is 90 days")
-        p = row_packet("recurring_work_compounds", "public_ai_initiative", persona="business_sponsor", title="COO")
+        self.assertEqual(self.check(pk(bundle__published_date="2026-06-24")), [])  # 90 days, operations_leader_appointment allows 90
+        self.assertBlocks(pk(bundle__published_date="2026-06-23"), "91 days old, operations_leader_appointment freshness is 90 days")
+        p = row_packet("scheduled_reports", "public_operations_initiative", persona="business_sponsor", title="COO")
         p["bundle"]["published_date"] = "2026-07-24"  # 60 days
         self.assertEqual(self.check(p), [])
         p["bundle"]["published_date"] = "2026-07-23"  # 61 days
-        self.assertBlocks(p, "61 days old, public_ai_initiative freshness is 60 days")
+        self.assertBlocks(p, "61 days old, public_operations_initiative freshness is 60 days")
 
     def test_checked_at_elapsed_boundary(self):
         ok = (NOW - timedelta(hours=23, minutes=59)).isoformat()
@@ -159,33 +183,33 @@ class OutreachGateTests(unittest.TestCase):
         return og.fit_flags(p, POL, SHARED)
 
     def test_unbound_claim_flags_binding_independently_of_vertical(self):
-        p = row_packet("api_embed", "ai_exec_appointment", vertical="technology", persona="technical_evaluator", title="CIO")
+        p = row_packet("data_exchange", "operations_leader_appointment", vertical="technology", persona="technical_evaluator", title="CIO")
         self.assertEqual(self.check(p), [])
-        binding = "best guess. claim api_embed is outside the ai_exec_appointment binding"
+        binding = "best guess. claim data_exchange is outside the operations_leader_appointment binding"
         self.assertEqual(self.flags(p), [binding])
-        p = row_packet("api_embed", "ai_exec_appointment", vertical="legal", persona="technical_evaluator", title="CIO")
+        p = row_packet("data_exchange", "operations_leader_appointment", vertical="legal", persona="technical_evaluator", title="CIO")
         self.assertEqual(self.check(p), [])
-        self.assertEqual(self.flags(p), [binding, "best guess. claim api_embed verticals ['technology', 'financial_services', 'professional_services'] do not include bundle vertical 'legal'"])
+        self.assertEqual(self.flags(p), [binding, "best guess. claim data_exchange verticals ['technology', 'financial_services', 'professional_services'] do not include bundle vertical 'legal'"])
 
     def test_bound_vertical_row_allows_when_vertical_and_persona_fit(self):
-        p = row_packet("api_embed", "ai_vendor_partnership", vertical="technology", persona="technical_evaluator", title="CIO")
+        p = row_packet("data_exchange", "supplier_partnership", vertical="technology", persona="technical_evaluator", title="CIO")
         self.assertEqual(self.check(p), [])
         self.assertEqual(self.flags(p), [])
 
     def test_bound_vertical_row_flags_not_blocks_when_vertical_differs(self):
-        p = row_packet("api_embed", "ai_vendor_partnership", vertical="legal", persona="technical_evaluator", title="CIO")
+        p = row_packet("data_exchange", "supplier_partnership", vertical="legal", persona="technical_evaluator", title="CIO")
         self.assertEqual(self.check(p), [])
-        self.assertEqual(self.flags(p), ["best guess. claim api_embed verticals ['technology', 'financial_services', 'professional_services'] do not include bundle vertical 'legal'"])
+        self.assertEqual(self.flags(p), ["best guess. claim data_exchange verticals ['technology', 'financial_services', 'professional_services'] do not include bundle vertical 'legal'"])
 
     def test_vertical_row_flags_when_bundle_vertical_is_null(self):
-        p = row_packet("api_embed", "ai_vendor_partnership", vertical=None, persona="technical_evaluator", title="CIO")
+        p = row_packet("data_exchange", "supplier_partnership", vertical=None, persona="technical_evaluator", title="CIO")
         self.assertEqual(self.check(p), [])
         self.assertTrue(any("do not include bundle vertical None" in x for x in self.flags(p)))
 
     def test_persona_outside_row_flags_not_blocks(self):
         p = pk(claim__persona="champion")
         self.assertEqual(self.check(p), [])
-        self.assertEqual(self.flags(p), ["best guess. claim adoption_scaffolding personas do not include champion"])
+        self.assertEqual(self.flags(p), ["best guess. claim report_setup personas do not include champion"])
 
     def test_unknown_row_yields_no_flags(self):
         self.assertEqual(self.flags(pk(claim__id="nope")), [])
@@ -203,15 +227,15 @@ class OutreachGateTests(unittest.TestCase):
 
     def test_held_row_blocks(self):
         d = shared_copy(lambda d: None)
-        p = d / "claims.json"; tt = json.loads(p.read_text()); tt["held"] = ["adoption_scaffolding"]
+        p = d / "claims.json"; tt = json.loads(p.read_text()); tt["held"] = ["report_setup"]
         p.write_text(json.dumps(tt, indent=2))
         try:
-            self.assertBlocks(PACKET, "claim adoption_scaffolding is held in claims.json held", shared=d)
+            self.assertBlocks(PACKET, "claim report_setup is held in claims.json held", shared=d)
         finally:
             shutil.rmtree(d)
 
     def test_unknown_signal_type_blocks(self):
-        self.assertBlocks(pk(bundle__signal_type="generic_ai_marketing"), "bundle signal_type not a tier1 or tier2")
+        self.assertBlocks(pk(bundle__signal_type="generic_marketing"), "bundle signal_type not a tier1 or tier2")
 
     # approval stamps
     def test_fixture_units_are_all_stamped(self):
@@ -224,18 +248,18 @@ class OutreachGateTests(unittest.TestCase):
         self.assertTrue(approval.stamp_current(fm["persona_cares"], fm["persona_cares_approved"]))
 
     def test_changed_row_blocks_until_restamped(self):
-        d = shared_copy(lambda d: edit_row(d, "adoption_scaffolding", track="A new sentence nobody approved."))
+        d = shared_copy(lambda d: edit_row(d, "report_setup", track="A new sentence nobody approved."))
         try:
-            self.assertBlocks(PACKET, "claim adoption_scaffolding changed since its approval stamp", shared=d)
-            edit_row(d, "adoption_scaffolding", restamp=True)
+            self.assertBlocks(PACKET, "claim report_setup changed since its approval stamp", shared=d)
+            edit_row(d, "report_setup", restamp=True)
             self.assertEqual(self.check(PACKET, shared=d), [])
         finally:
             shutil.rmtree(d)
 
     def test_changed_signal_entry_blocks(self):
-        d = shared_copy(lambda d: edit_signal(d, "ai_exec_appointment", freshness_days=365))
+        d = shared_copy(lambda d: edit_signal(d, "operations_leader_appointment", freshness_days=365))
         try:
-            self.assertBlocks(PACKET, "signal type ai_exec_appointment changed since its approval stamp", shared=d)
+            self.assertBlocks(PACKET, "signal type operations_leader_appointment changed since its approval stamp", shared=d)
         finally:
             shutil.rmtree(d)
 
@@ -248,72 +272,72 @@ class OutreachGateTests(unittest.TestCase):
 
     # numbers
     def test_number_from_claim_or_quote_allows(self):
-        p = row_packet("enterprise_controls", "ai_rfp_or_procurement", persona="technical_evaluator", title="CIO")
+        p = row_packet("access_controls", "service_procurement", persona="technical_evaluator", title="CIO")
         p["draft"]["body"] = "Your RFP names admin controls.\n\nThe 2026 release notes cover credit controls and Teams. Happy to walk through them.\n\nWorth a call?"
         self.assertEqual(self.check(p), [])
-        p = pk(bundle__quote="Acme hired 40 AI engineers this quarter.")
-        p["draft"]["body"] = "You hired 40 AI engineers.\n\nThat creates a tooling decision. Access alone rarely drives use.\n\nWorth a call?"
+        p = pk(bundle__quote="Acme hired 40 operations engineers this quarter.")
+        p["draft"]["body"] = "You hired 40 operations engineers.\n\nThat creates a tooling decision. Access alone rarely drives use.\n\nWorth a call?"
         self.assertEqual(self.check(p), [])
 
     def test_number_only_in_limit_blocks(self):
-        d = shared_copy(lambda d: edit_row(d, "adoption_scaffolding", restamp=True, limit="Do not claim a 30 percent lift."))
+        d = shared_copy(lambda d: edit_row(d, "report_setup", restamp=True, limit="Do not claim a 30 percent lift."))
         try:
-            p = pk(draft__body="You named a Chief AI Officer.\n\nSome teams see a 30 percent lift.\n\nWorth a call?")
+            p = pk(draft__body="You named a Chief Operating Officer.\n\nSome teams see a 30 percent lift.\n\nWorth a call?")
             self.assertBlocks(p, "numbers in body not in the row's claim or track or the bundle quote: 30", shared=d)
         finally:
             shutil.rmtree(d)
 
     def test_invite_minutes_exempt_only_as_invitation_in_question(self):
-        self.assertEqual(self.check(pk(draft__body="You named a Chief AI Officer.\n\nAccess alone rarely drives use.\n\nWorth 20 minutes?")), [])
-        self.assertEqual(self.check(pk(draft__body="You named a Chief AI Officer.\n\nAccess alone rarely drives use.\n\nWould you have 20 minutes to discuss?\n\nSeller\nExample Product")), [])
-        p = pk(draft__body="You named a Chief AI Officer.\n\nI have 20 minutes free this week. Access alone rarely drives use.\n\nWorth a call?")
+        self.assertEqual(self.check(pk(draft__body="You named a Chief Operating Officer.\n\nAccess alone rarely drives use.\n\nWorth 20 minutes?")), [])
+        self.assertEqual(self.check(pk(draft__body="You named a Chief Operating Officer.\n\nAccess alone rarely drives use.\n\nWould you have 20 minutes to discuss?\n\nSeller\nExample Product")), [])
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nI have 20 minutes free this week. Access alone rarely drives use.\n\nWorth a call?")
         self.assertBlocks(p, "numbers in body not in the row's claim or track or the bundle quote: 20")
-        p = pk(draft__body="You named a Chief AI Officer.\n\nAccess alone rarely drives use.\n\nWorth 20 minutes, maybe 30?")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nAccess alone rarely drives use.\n\nWorth 20 minutes, maybe 30?")
         self.assertBlocks(p, "the bundle quote: 30")
 
     def test_invite_minutes_do_not_authorize_same_number_elsewhere(self):
-        p = pk(draft__body="You named a Chief AI Officer.\n\nThis cuts costs by 20%. Access alone rarely drives use.\n\nWould you have 20 minutes to discuss?")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nThis cuts costs by 20%. Access alone rarely drives use.\n\nWould you have 20 minutes to discuss?")
         self.assertBlocks(p, "numbers in body not in the row's claim or track or the bundle quote: 20")
 
     def test_minutes_claim_in_question_still_blocks(self):
-        p = pk(draft__body="You named a Chief AI Officer.\n\nAccess alone rarely drives use.\n\nCould this save 20 minutes per report?")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nAccess alone rarely drives use.\n\nCould this save 20 minutes per report?")
         self.assertBlocks(p, "numbers in body not in the row's claim or track or the bundle quote: 20")
-        p = pk(draft__body="You named a Chief AI Officer.\n\nAccess alone rarely drives use.\n\nCould this save you 20 minutes on each call?")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nAccess alone rarely drives use.\n\nCould this save you 20 minutes on each call?")
         self.assertBlocks(p, "numbers in body not in the row's claim or track or the bundle quote: 20")
 
     # proof names
     def test_proof_name_blocks_when_external_ok_false(self):
-        p = row_packet("missing_middle", "incumbent_standardization", persona="economic_buyer", title="CIO")
+        p = row_packet("private_case_study", "incumbent_standardization", persona="economic_buyer", title="CIO")
         p["draft"]["body"] = "You standardized on Example Tool.\n\nExample Private Customer found the same gap.\n\nWorth a call?"
-        self.assertBlocks(p, "body names Example Private Customer from row missing_middle proof")
+        self.assertBlocks(p, "body names Example Private Customer from row private_case_study proof")
 
     def test_proof_name_allowed_for_chosen_row_with_external_ok(self):
-        p = row_packet("legal_cited_context", "ai_exec_appointment", vertical="legal", persona="business_sponsor", title="CIO")
-        p["draft"]["body"] = "You named a Chief AI Officer.\n\nExample Public Customer says cited context matters because attorneys can check it.\n\nWorth a call?"
+        p = row_packet("public_case_study", "operations_leader_appointment", vertical="legal", persona="business_sponsor", title="CIO")
+        p["draft"]["body"] = "You named a Chief Operating Officer.\n\nExample Public Customer says cited context matters because attorneys can check it.\n\nWorth a call?"
         self.assertEqual(self.check(p), [])
 
     def test_prospect_name_equal_to_a_proof_name_passes(self):
-        p = row_packet("completed_work", "ai_exec_appointment", persona="ai_owner")
+        p = row_packet("report_delivery", "operations_leader_appointment", persona="operations_owner")
         p["bundle"]["account_name"] = "Example Prospect"
         p["bundle"]["account_domain"] = "example.org"
         p["recipient"]["email"] = "jane@example.org"
-        p["draft"]["body"] = "You named a Chief AI Officer at Example Prospect.\n\nThat creates a tooling review. Customers describe getting back finished work.\n\nWorth a call?"
+        p["draft"]["body"] = "You named a Chief Operating Officer at Example Prospect.\n\nThat creates a tooling review. Customers describe getting back finished work.\n\nWorth a call?"
         self.assertEqual(self.check(p), [])
         p["bundle"]["account_name"] = "Example Prospect Oyj"
-        self.assertBlocks(p, "body names Example Prospect from row regulatory_monitoring proof")
+        self.assertBlocks(p, "body names Example Prospect from row policy_updates proof")
 
     def test_proof_name_from_another_row_blocks(self):
-        p = pk(draft__body="You named a Chief AI Officer.\n\nExample Public Customer says cited context matters.\n\nWorth a call?")
-        self.assertBlocks(p, "body names Example Public Customer from row legal_cited_context proof")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nExample Public Customer says cited context matters.\n\nWorth a call?")
+        self.assertBlocks(p, "body names Example Public Customer from row public_case_study proof")
 
     # evidence copying
     def test_eight_word_evidence_run_blocks_and_seven_passes(self):
-        ev = ROWS["completed_work"]["evidence"]
+        ev = ROWS["report_delivery"]["evidence"]
         words = re.findall(r"[a-z0-9&'-]+", ev.lower())
-        p = row_packet("completed_work", "ai_exec_appointment", persona="ai_owner")
-        p["draft"]["body"] = "You named a Chief AI Officer.\n\n" + " ".join(words[:8]) + ".\n\nWorth a call?"
+        p = row_packet("report_delivery", "operations_leader_appointment", persona="operations_owner")
+        p["draft"]["body"] = "You named a Chief Operating Officer.\n\n" + " ".join(words[:8]) + ".\n\nWorth a call?"
         self.assertBlocks(p, "copies 8 or more words from the row's evidence")
-        p["draft"]["body"] = "You named a Chief AI Officer.\n\n" + " ".join(words[:7]) + ".\n\nWorth a call?"
+        p["draft"]["body"] = "You named a Chief Operating Officer.\n\n" + " ".join(words[:7]) + ".\n\nWorth a call?"
         self.assertEqual(self.check(p), [])
 
     # recipient
@@ -321,17 +345,17 @@ class OutreachGateTests(unittest.TestCase):
         self.assertBlocks(pk(recipient__title="VP of Marketing"), "outside target_titles")
 
     def test_recipient_title_substring_match_allows(self):
-        self.assertEqual(self.check(pk(recipient__title="Global Head of AI and Data")), [])
+        self.assertEqual(self.check(pk(recipient__title="Global Head of Operations and Data")), [])
 
     def test_quoted_executive_matches_evidence_subject(self):
-        p = row_packet("completed_work", "exec_ai_statements", persona="economic_buyer", title="Chief Knowledge Officer")
+        p = row_packet("report_delivery", "executive_statements", persona="economic_buyer", title="Chief Knowledge Officer")
         p["bundle"]["evidence_subject"] = "Jane Doe"
         self.assertEqual(self.check(p), [])
         p["recipient"]["name"] = "John Roe"
         self.assertBlocks(p, "outside target_titles")
 
     def test_title_override_allows_and_blank_does_not(self):
-        p = pk(recipient__title="VP of Marketing", recipient__title_override="Seller named her in the thread, she owns the AI budget")
+        p = pk(recipient__title="VP of Marketing", recipient__title_override="Seller named her in the thread, she owns the operations budget")
         self.assertEqual(self.check(p), [])
         self.assertBlocks(pk(recipient__title="VP of Marketing", recipient__title_override="  "), "outside target_titles")
 
@@ -358,10 +382,10 @@ class OutreachGateTests(unittest.TestCase):
         self.assertIn("signal quote pasted whole into body", self.check(pk(draft__body=PACKET["bundle"]["quote"] + "\n\nWorth a call?")))
 
     def test_date_opener_blocks(self):
-        self.assertIn("body opens on a date", self.check(pk(draft__body="On September 10, Acme named a Chief AI Officer.\n\nWorth a call?")))
+        self.assertIn("body opens on a date", self.check(pk(draft__body="On September 10, Acme named a Chief Operating Officer.\n\nWorth a call?")))
 
     def test_two_questions_block(self):
-        self.assertBlocks(pk(draft__body="You named a Chief AI Officer.\n\nHow is it going? Worth a call?"), "question marks")
+        self.assertBlocks(pk(draft__body="You named a Chief Operating Officer.\n\nHow is it going? Worth a call?"), "question marks")
 
     def test_long_subject_blocks(self):
         self.assertIn("subject too long", self.check(pk(draft__subject="a b c d e f g h i j")))

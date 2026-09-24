@@ -2,6 +2,9 @@
 
 Manual only. A complete organization revenue series may select owned accounts
 for exact fixed-template, unsent drafts to their verified billing addresses.
+This optional self-service subscription module requires daily ARR normalized to
+USD. It does not apply to transaction revenue or ordinary service fees and is
+not a prerequisite for core outreach.
 
 ## Load / Skip
 
@@ -30,4 +33,4 @@ The review shows data-through date, confirmed adapter success reference, query/s
 
 ## Human check
 
-Review adapter/date/coverage evidence, ownership, territory, suppression, fixed wording and every recipient. No unattended runs, sends, CRM tasks, contacts, account changes or financial data copied into CRM/wiki files. Missing adapters remain an unavailable capability, even if synthetic tests pass.
+Review adapter/date/coverage evidence, ownership, territory, suppression, fixed wording and every recipient. No unattended runs, sends, CRM tasks, contacts, account changes or financial data copied into CRM/knowledge files. Missing adapters remain an unavailable capability, even if synthetic tests pass.

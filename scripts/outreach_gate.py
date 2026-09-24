@@ -9,6 +9,8 @@ Packet keys:
   recipient: {email, name, source, title, title_override}; override is a real
     user-supplied reason, or null. source equals a configured recipient source.
   activity: [{kind: task|event|mail_sent, date: ISO date, subtype, status, subject}].
+    Task status is the provider's exact value, mapped through the reviewed
+    outreach.task_status_map. Unmapped statuses are unusable input, not open work.
   activity_complete: true only after all required CRM/mail pages were read.
   voice_anchor_reference: the approved or user-supplied email example reference.
   draft: {subject, body}.
@@ -108,7 +110,9 @@ def check(p, pol, shared, now):
     b, tt, rc, act, dr = p["bundle"], p["claim"], p["recipient"], p["activity"], p["draft"]
     if b.get("gate") != "evidence_gate" or not b.get("quote"):
         reasons.append("a qualified evidence bundle is required")
-    if not isinstance(act, list) or p.get("activity_complete") is not True:
+    if not isinstance(act, list) or any(not isinstance(a, dict) for a in act):
+        raise ValueError("activity must be a complete list of normalized records")
+    if p.get("activity_complete") is not True:
         reasons.append("complete CRM and sent-mail activity reads are required")
     if not isinstance(p.get("voice_anchor_reference"), str) or not p["voice_anchor_reference"].strip():
         reasons.append("an approved email voice anchor reference is required")
@@ -197,13 +201,19 @@ def check(p, pol, shared, now):
     if rc["source"] not in pol["recipient_sources"]:
         reasons.append("recipient source not in policy. Needs the reviewer to name the address")
     cutoff = today - timedelta(days=pol["suppression_days"])
+    status_map = factory.task_status_map(pol)
     for a in act:
         if a.get("kind") not in ("task", "event", "mail_sent"):
             raise ValueError("unrecognized activity kind; normalize the complete provider read")
-        if a["kind"] == "task" and not a.get("status"):
-            raise ValueError("task activity needs status")
+        state = None
+        if a["kind"] == "task":
+            if not isinstance(a.get("status"), str) or a["status"] not in status_map:
+                raise ValueError("unmapped task status; configure outreach.task_status_map from the provider's documented states")
+            if not isinstance(a.get("subtype"), str) or not a["subtype"].strip():
+                raise ValueError("task activity needs its mapped subtype")
+            state = status_map[a["status"]]
         done = a["kind"] in ("mail_sent", "event") or (
-            a.get("status") == "Completed" and a.get("subtype") in pol["suppressing_task_subtypes"])
+            state == "completed" and a["subtype"] in pol["suppressing_task_subtypes"])
         if done and d(a["date"]) >= cutoff:
             reasons.append(f"suppressed: {a['kind']} on {a['date'][:10]} inside suppression window")
             break

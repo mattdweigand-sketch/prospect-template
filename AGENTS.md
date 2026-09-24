@@ -4,6 +4,8 @@ A configurable, human-reviewed prospecting workspace.
 This is the canonical entry for all agents. Generated skills point here.
 
 Read [CONTEXT.md](CONTEXT.md), choose one task, then open its workspace contract.
+"Run setup" routes to `prospect-setup`; existing deployments start with current
+settings and a scoped change request.
 
 | Need | Owner |
 |---|---|

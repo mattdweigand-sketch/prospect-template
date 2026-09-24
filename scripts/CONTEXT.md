@@ -17,6 +17,8 @@ Python 3.9+ standard library only; factory configuration uses canonical JSON.
 | followup_gate.py | Unique sent proof, contact, duplicate task and timezone-aware due date |
 | arr_growth_gate.py | Complete growth candidate packet, routing/suppression, fixed template and cap |
 | refresh_tracks.py | Pinned-commit evidence report and separate proposed factory postimages |
+| source_snapshot.py | Version explicitly supplied materials privately; preserve provenance and prior history |
+| validate_setup.py | Check deployed/proposed ICP, bindings, approvals, voice and pinned source evidence |
 | build_pairings.py | Rebuild ignored pairings.md; reject unknown/unreachable claim bindings |
 | approval.py | Detect changed approved content units; never grant authorization |
 | factory.py | Read canonical JSON files, ICP frontmatter and safe relative paths |

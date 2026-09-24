@@ -15,7 +15,7 @@ Choose one row and follow [the run lifecycle](../run.md). Skip sibling procedure
 |---|---|---|
 | `signal-outreach` | [signal-outreach.md](signal-outreach.md) | Prepare one evidence-backed cold email and create an unsent draft after exact approval. |
 | `signal-followup` | [signal-followup.md](signal-followup.md) | Create one CRM follow-up task after a uniquely identified email was actually sent. |
-| `signal-arr-growth` | [signal-arr-growth.md](signal-arr-growth.md) | Find eligible self-service growth accounts through a configured billing adapter and propose template drafts. |
+| `signal-arr-growth` | [signal-arr-growth.md](signal-arr-growth.md) | Optional subscription module: find self-service ARR growth accounts and propose configured template drafts. |
 
 ## Outputs
 The chosen workflow defines output/{run-id}/01_review.md, any declared artifacts, and 02_result.json.

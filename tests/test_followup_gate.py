@@ -23,7 +23,7 @@ BASE = {
     "account": {"id": "account-1", "owner_id": OWNER, "open_opportunity_ids": []},
     "contacts": [{"id": "contact-1", "email": "Louis@Example.org", "account_id": "account-1"}],
     "tasks": [{"id": "00T1", "subject": "LinkedIn - Connected", "description": ""}],
-    "signal": {"signal_type": "ai_exec_appointment", "claim_id": "completed_work"},
+    "signal": {"signal_type": "operations_leader_appointment", "claim_id": "report_delivery"},
 }
 
 
@@ -47,16 +47,16 @@ class Allow(unittest.TestCase):
         self.assertEqual(t["due_date"], "2026-09-28")
         self.assertIn("m1", t["description"])
         self.assertIn("t1", t["description"])
-        self.assertIn("signal_type ai_exec_appointment", t["description"])
-        self.assertIn("claim_id completed_work", t["description"])
+        self.assertIn("signal_type operations_leader_appointment", t["description"])
+        self.assertIn("claim_id report_delivery", t["description"])
         self.assertNotIn("Type", t)
 
     def test_unknown_signal_type_blocks(self):
-        out = run(signal={"signal_type": "vibes", "claim_id": "completed_work"})
+        out = run(signal={"signal_type": "vibes", "claim_id": "report_delivery"})
         self.assertTrue(any("signal_type not a tier1 or tier2" in r for r in out["reasons"]))
 
     def test_unknown_claim_blocks(self):
-        out = run(signal={"signal_type": "ai_exec_appointment", "claim_id": "nope"})
+        out = run(signal={"signal_type": "operations_leader_appointment", "claim_id": "nope"})
         self.assertTrue(any("claim_id not in claims.json" in r for r in out["reasons"]))
 
     def test_missing_signal_blocks(self):

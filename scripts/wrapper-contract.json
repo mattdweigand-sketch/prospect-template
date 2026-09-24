@@ -1,6 +1,19 @@
 {
   "version": 2,
   "commands": {
+    "prospect-setup": {
+      "description": "Run guided setup or update a team's ICP, messaging, signal mappings and email voice from its own materials.",
+      "workspace": "workflows/knowledge/CONTEXT.md",
+      "workflow": "workflows/knowledge/prospect-setup.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/source_snapshot.py",
+        "scripts/validate_setup.py",
+        "scripts/refresh_tracks.py",
+        "scripts/approval.py",
+        "scripts/build_pairings.py"
+      ]
+    },
     "signal-scan": {
       "description": "Find and qualify public buying signals for one named account.",
       "workspace": "workflows/research/CONTEXT.md",
@@ -9,15 +22,6 @@
         "scripts/factory.py",
         "scripts/evidence_gate.py",
         "scripts/scan_verdict.py"
-      ]
-    },
-    "signal-user-scan": {
-      "description": "Produce an organization-level adoption finding using a configured private-data adapter.",
-      "workspace": "workflows/research/CONTEXT.md",
-      "workflow": "workflows/research/signal-user-scan.md",
-      "checks": [
-        "scripts/factory.py",
-        "scripts/privacy_check.py"
       ]
     },
     "signal-prospector": {
@@ -51,16 +55,6 @@
         "scripts/followup_gate.py"
       ]
     },
-    "signal-arr-growth": {
-      "description": "Find eligible self-service growth accounts through a configured billing adapter and propose template drafts.",
-      "workspace": "workflows/outreach/CONTEXT.md",
-      "workflow": "workflows/outreach/signal-arr-growth.md",
-      "checks": [
-        "scripts/factory.py",
-        "scripts/arr_growth_gate.py",
-        "scripts/route_candidate.py"
-      ]
-    },
     "signal-refresh": {
       "description": "Propose claim-library updates from a configured, versioned knowledge source.",
       "workspace": "workflows/knowledge/CONTEXT.md",
@@ -70,6 +64,25 @@
         "scripts/refresh_tracks.py",
         "scripts/approval.py",
         "scripts/build_pairings.py"
+      ]
+    },
+    "signal-user-scan": {
+      "description": "Optional subscription module: produce an organization-level adoption finding through a configured private-data adapter.",
+      "workspace": "workflows/research/CONTEXT.md",
+      "workflow": "workflows/research/signal-user-scan.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/privacy_check.py"
+      ]
+    },
+    "signal-arr-growth": {
+      "description": "Optional subscription module: find self-service ARR growth accounts and propose configured template drafts.",
+      "workspace": "workflows/outreach/CONTEXT.md",
+      "workflow": "workflows/outreach/signal-arr-growth.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/arr_growth_gate.py",
+        "scripts/route_candidate.py"
       ]
     }
   }

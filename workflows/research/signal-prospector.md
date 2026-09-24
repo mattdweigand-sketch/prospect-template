@@ -6,7 +6,7 @@ Discover candidate accounts, verify their evidence and territory, and propose ex
 
 - Working: output/{run-id}/request.md, named territory and filters.
 - Reference: workflows/run.md, _shared/rules.md; policy.json identity, scan, routing, prospector and adoption enablement; taxonomy.json; icp.md frontmatter; adapters.md public research, CRM claim mappings, verified enrichment and optionally adoption_territory.
-- Skip: mail, Slack, billing growth, claims.json and the knowledge source. If adoption is disabled, continue public discovery and show that source as unavailable.
+- Skip: mail, team chat, billing growth, claims.json and the knowledge source. If adoption is disabled, continue public discovery and show that source as unavailable.
 
 ## Process
 

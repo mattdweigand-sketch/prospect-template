@@ -14,8 +14,8 @@ Choose one row and follow [the run lifecycle](../run.md). Skip sibling procedure
 | Command | Contract | Job |
 |---|---|---|
 | `signal-scan` | [signal-scan.md](signal-scan.md) | Find and qualify public buying signals for one named account. |
-| `signal-user-scan` | [signal-user-scan.md](signal-user-scan.md) | Produce an organization-level adoption finding using a configured private-data adapter. |
 | `signal-prospector` | [signal-prospector.md](signal-prospector.md) | Discover candidate accounts, resolve CRM ownership, and propose exact account claims. |
+| `signal-user-scan` | [signal-user-scan.md](signal-user-scan.md) | Optional subscription module: produce an organization-level adoption finding through a configured private-data adapter. |
 
 ## Outputs
 The chosen workflow defines output/{run-id}/01_review.md, any declared artifacts, and 02_result.json.

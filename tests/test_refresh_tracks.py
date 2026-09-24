@@ -18,17 +18,17 @@ class RefreshTracksTests(unittest.TestCase):
     def test_verify_rows_folds_whitespace_and_case(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / "learnings").mkdir()
-            (Path(d) / "learnings" / "a.md").write_text("Intro.\nComputer  hands back\nfinished Work.\n")
-            rows = [{"id": "ok", "source_reference": "learnings/a.md", "evidence": "computer hands back finished work."},
-                    {"id": "bad", "source_reference": "learnings/a.md", "evidence": "Computer drafts work."},
+            (Path(d) / "learnings" / "a.md").write_text("Intro.\nSupplier  hands back\nfinished Work.\n")
+            rows = [{"id": "ok", "source_reference": "learnings/a.md", "evidence": "supplier hands back finished work."},
+                    {"id": "bad", "source_reference": "learnings/a.md", "evidence": "Supplier drafts work."},
                     {"id": "gone", "source_reference": "learnings/b.md", "evidence": "x"}]
             broken, missing = rt.verify_rows(rows, d)
             self.assertEqual([b["id"] for b in broken], ["bad"])
             self.assertEqual([m["id"] for m in missing], ["gone"])
 
     def test_changed_pages_filters_dirs_ignores_and_deletes(self):
-        diff = "A\twiki/customers/example.md\nM\twiki/index.md\nM\twiki/systems/x.md\nD\twiki/learnings/old.md\nM\twiki/learnings/customer-value-patterns.md\nR100\twiki/customers/a.md\twiki/customers/b.md\nM\tREADME.md"
-        out = rt.changed_pages(diff, "wiki/", WATCH, IGNORE)
+        diff = "A\tknowledge/customers/example.md\nM\tknowledge/index.md\nM\tknowledge/systems/x.md\nD\tknowledge/learnings/old.md\nM\tknowledge/learnings/customer-value-patterns.md\nR100\tknowledge/customers/a.md\tknowledge/customers/b.md\nM\tREADME.md"
+        out = rt.changed_pages(diff, "knowledge/", WATCH, IGNORE)
         self.assertEqual(out, [{"status": "added", "path": "customers/example.md"},
                                {"status": "modified", "path": "learnings/customer-value-patterns.md"}])
 
@@ -61,20 +61,38 @@ class RefreshTracksTests(unittest.TestCase):
             self.assertEqual(json.loads(text), after)
 
     def test_changed_watch_files_needs_exact_path(self):
-        diff = "M\twiki/analyses/enterprise-ideal-customer-profile.md\nM\twiki/contradictions.md\nM\twiki/customers/contradictions.md\nD\twiki/analyses/other.md\nM\tcontradictions.md"
-        out = rt.changed_watch_files(diff, "wiki/", ["analyses/enterprise-ideal-customer-profile.md", "contradictions.md"])
+        diff = "M\tknowledge/analyses/enterprise-ideal-customer-profile.md\nM\tknowledge/contradictions.md\nM\tknowledge/customers/contradictions.md\nD\tknowledge/analyses/other.md\nM\tcontradictions.md"
+        out = rt.changed_watch_files(diff, "knowledge/", ["analyses/enterprise-ideal-customer-profile.md", "contradictions.md"])
         self.assertEqual(out, ["analyses/enterprise-ideal-customer-profile.md", "contradictions.md"])
 
     def test_contradiction_flags_match_open_entries_only(self):
-        text = ("# Contradictions\n\n## Open\n\n### [Status: open] Sandbox API availability\n"
-                "Claim A: x - source: [[example-api]]\nClaim B: y - source: [[sandbox-page|Sandbox]]\n\n"
-                "## Resolved\n\n### [Status: resolved] Old one\nClaim A: z - source: [[customer-value-patterns]]\n")
-        rows = [{"id": "agent_api", "source_reference": "products/example-api.md"},
-                {"id": "completed_work", "source_reference": "learnings/customer-value-patterns.md"},
-                {"id": "hybrid_local", "source_reference": "sources/sandbox-page.md"}]
+        text = json.dumps({"schema_version": 1, "contradictions": [
+            {"id": "scope-1", "status": "open", "summary": "Service availability differs.",
+             "source_references": ["offers/service.md", "terms/coverage.md"]},
+            {"id": "scope-2", "status": "resolved", "summary": "Previous scope clarified.",
+             "source_references": ["cases/example.md"]}]})
+        rows = [{"id": "service_catalog", "source_reference": "offers/service.md"},
+                {"id": "report_delivery", "source_reference": "cases/example.md"},
+                {"id": "regional_delivery", "source_reference": "terms/coverage.md"},
+                {"id": "same_basename", "source_reference": "other/service.md"}]
         out = rt.contradiction_flags(text, rows)
-        self.assertEqual(sorted(o["id"] for o in out), ["agent_api", "hybrid_local"])
-        self.assertEqual(out[0]["contradiction"], "Sandbox API availability")
+        self.assertEqual(sorted(o["id"] for o in out), ["regional_delivery", "service_catalog"])
+        self.assertEqual(out[0]["contradiction"], "Service availability differs.")
+        self.assertEqual(out[0]["contradiction_id"], "scope-1")
+
+    def test_invalid_contradiction_formats_never_look_empty(self):
+        valid = {"id": "one", "status": "open", "summary": "Scope differs.", "source_references": ["offers/service.md"]}
+        cases = ["", "# Open issues\nUnsupported Markdown.", "[]", "{}",
+                 json.dumps({"schema_version": 2, "contradictions": []}),
+                 json.dumps({"schema_version": True, "contradictions": []})]
+        for entries in ([valid, valid], [{**valid, "status": "unknown"}], [{**valid, "summary": ""}],
+                        [{**valid, "source_references": []}], [{**valid, "source_references": ["../outside.md"]}],
+                        [{**valid, "source_references": ["offers/service.md", "offers/service.md"]}], [None]):
+            cases.append(json.dumps({"schema_version": 1, "contradictions": entries}))
+        for text in cases:
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                rt.contradiction_flags(text, [])
+        self.assertEqual(rt.contradiction_flags('{"schema_version":1,"contradictions":[]}', []), [])
 
     def test_approve_rows_restamps_only_named_rows(self):
         import shutil
@@ -84,18 +102,18 @@ class RefreshTracksTests(unittest.TestCase):
             p = Path(d) / "claims.json"
             tt = json.loads(p.read_text())
             for r in tt["claims"]:
-                if r["id"] in ("completed_work", "domain_context"):
+                if r["id"] in ("report_delivery", "account_context"):
                     r["track"] = "Changed."
             rt.write_tracks(tt, p)
             tt = json.loads(p.read_text())
             stale = [r["id"] for r in tt["claims"] if not approval.stamp_current(r, r.get("approved"))]
-            self.assertEqual(stale, ["completed_work", "domain_context"])
-            done = rt.approve_rows({"completed_work"}, Path(d), today="2026-10-02")
-            self.assertEqual(done, ["completed_work"])
+            self.assertEqual(stale, ["report_delivery", "account_context"])
+            done = rt.approve_rows({"report_delivery"}, Path(d), today="2026-10-02")
+            self.assertEqual(done, ["report_delivery"])
             tt = json.loads(p.read_text())
             stale = [r["id"] for r in tt["claims"] if not approval.stamp_current(r, r.get("approved"))]
-            self.assertEqual(stale, ["domain_context"])
-            cw = next(r for r in tt["claims"] if r["id"] == "completed_work")
+            self.assertEqual(stale, ["account_context"])
+            cw = next(r for r in tt["claims"] if r["id"] == "report_delivery")
             self.assertEqual(str(cw["approved"]["date"]), "2026-10-02")
             self.assertTrue(approval.stamp_current(cw, cw["approved"]))
 

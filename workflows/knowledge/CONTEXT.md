@@ -13,6 +13,7 @@ Choose one row and follow [the run lifecycle](../run.md). Skip sibling procedure
 
 | Command | Contract | Job |
 |---|---|---|
+| `prospect-setup` | [prospect-setup.md](prospect-setup.md) | Run guided setup or update a team's ICP, messaging, signal mappings and email voice from its own materials. |
 | `signal-refresh` | [signal-refresh.md](signal-refresh.md) | Propose claim-library updates from a configured, versioned knowledge source. |
 
 ## Outputs

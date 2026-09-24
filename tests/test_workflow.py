@@ -22,7 +22,7 @@ class WorkspaceTests(unittest.TestCase):
         shutil.copytree(ROOT, self.root, ignore=shutil.ignore_patterns(".git", "output", "__pycache__"))
         for example in (self.root / "_shared").glob("*.example.*"):
             shutil.copyfile(example, example.with_name(example.name.replace(".example", "")))
-        self.command = next(iter(wrappers.load_routes(self.root)))
+        self.command = "signal-scan"
         self.path = runs.init(self.root, "synthetic-001", self.command)
 
     def ready(self):
@@ -38,6 +38,16 @@ class WorkspaceTests(unittest.TestCase):
 
     def test_starter_never_counts_as_ready(self):
         self.assertEqual(runs.status(self.root, self.path.name)["state"], "draft")
+
+    def test_canonical_runtime_does_not_require_host_wrappers(self):
+        # Remove only optional shortcuts in this isolated test workspace.
+        for folder in (".agents", ".claude"):
+            shutil.rmtree(self.root / folder)
+        self.ready()
+        review = self.approve()
+        self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_current")
+        self.result(review)
+        self.assertEqual(runs.status(self.root, self.path.name)["state"], "completion_recorded")
 
     def test_run_ids_cannot_escape_or_overwrite(self):
         for bad in ("../escape", "UPPER", "x/y", ""):

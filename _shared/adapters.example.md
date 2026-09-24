@@ -25,6 +25,7 @@ Provider/tools, field maps and reviewed validation reference: **unconfigured**.
 - Normalize domain consistently: lowercase, remove scheme, www, path, query, fragment and port. Reject blank/invalid/internal domains and do not collapse unrelated buying entities. A CRM replica cannot settle current ownership, opportunity status or duplicate identity.
 - Contacts: account association, ID, name/first/last/title and verified email with source. Read all exact-email matches, case-insensitively. Define verification status and bounded enrichment fallback; no pattern-generated email.
 - Tasks/events: account/contact links, ID, owner ID/name, subtype, status, subject, description and aware/date-normalized activity time. Document which provider field means a completed call/email, event date and scan task creation date. Return complete lists over the requested window; do not prefilter away scan integration-owner exclusions from outreach suppression.
+- Keep each task's exact provider status in the packet. Configure policy.outreach.task_status_map to classify each known value as completed, open or cancelled, based on provider documentation and verified reads. For example, a provider's Done may map to completed; this is not an assumed universal mapping. Unrecognized/missing statuses stop outreach. Configure suppressing_task_subtypes from the provider's email/call categories. Validate completed, open, cancelled and unknown cases before live use.
 - Prospect write allowlist: account create (name, website, owner, verified employee count); account owner transfer (owner only); contact create (account, first/last name, title, verified email). Supply exact native field names and required defaults before review. Existing contacts are reused. No merge/delete/opportunity/task writes through this adapter.
 - Follow-up write: normalized subject, account_id, contact_id, owner_id, status, priority, subtype, due_date, description mapped to exact native task fields. Configure closed statuses and identify who owns completed Email sync. No duplicate email logging and no undeclared Type/default fields.
 - Before writes, repeat relevant reads; after each returned ID, perform an independent read of every approved field. Document provider idempotency/error/uncertain-result behavior. Do not retry a possible write without checking whether it landed.
@@ -57,6 +58,7 @@ reason to log a second email task.
 
 ## adoption_lookup
 
+Optional subscription-business module; not required for core prospecting.
 Tool, query version, bindings, private SQL location and verification: **unconfigured**.
 
 Inputs: one resolved CRM account ID, normalized domain, complete data date.
@@ -105,6 +107,8 @@ adoption without a public corroborating signal and the configured result cap.
 
 ## billing_growth
 
+Optional self-service subscription module. Requires daily ARR normalized to USD;
+do not substitute transaction revenue or service fees for ARR.
 Tool, query version, bindings, currency basis and verification: **unconfigured**.
 
 Inputs: complete data date, window_days, owner ID, candidate_rows. Source
@@ -144,6 +148,28 @@ Read-only source tool, configured repository, clone/receipt mechanism and review
 and read committed regular files only. No upstream writes, local working-tree
 substitutions or memory-derived evidence. policy.refresh owns source/watch paths,
 clone depth and proposal cap; claims.json owns source_revision/source_root.
+The source can also be a private source_snapshot.py repository created by
+prospect-setup. Record its retained location and local read-only clone mechanism.
+Keep supplied originals, extraction provenance and user statements distinct;
+a source snapshot or matching evidence quote does not independently prove a claim.
+
+Optional contradiction register: policy.refresh.contradictions_path names a
+committed JSON file under claims.source_root. Use this provider-independent shape:
+
+```json
+{"schema_version": 1, "contradictions": [
+  {"id": "scope-1", "status": "open", "summary": "Service scope differs between these sources.",
+   "source_references": ["offers/service.md", "terms/scope.md"]}
+]}
+```
+
+IDs must be unique, status is open or resolved, and summary and exact relative
+source_references are required. Paths include their directories and extensions;
+matching never relies on a page title or basename. An empty contradictions list
+is an explicitly empty register. Unsupported formats, missing files and malformed
+entries stop verification; a null configured path means no automated register
+check, not proof that no contradictions exist. Convert other source formats in
+the source adapter and review the conversion before using the register.
 
 ## Retention and voice
 

@@ -10,8 +10,8 @@ sys.path.insert(0, str(SCRIPTS))
 import route_candidate as rc  # noqa: E402
 
 RULES = rc.load_rules(SHARED)
-T1 = [{"signal_type": "public_ai_initiative", "tier": "tier1"}]
-T2 = [{"signal_type": "exec_ai_statements", "tier": "tier2"}]
+T1 = [{"signal_type": "public_operations_initiative", "tier": "tier1"}]
+T2 = [{"signal_type": "executive_statements", "tier": "tier2"}]
 
 
 def receipt(**kw):
@@ -36,10 +36,10 @@ class RouteCandidateTests(unittest.TestCase):
         self.assertFalse(out["admitted"]); self.assertFalse(out["claimable"])
 
     def test_two_tier2_admitted(self):
-        self.assertTrue(rc.check(receipt(signals=T2 + [{"signal_type": "ai_vendor_partnership", "tier": "tier2"}]), RULES)["admitted"])
+        self.assertTrue(rc.check(receipt(signals=T2 + [{"signal_type": "supplier_partnership", "tier": "tier2"}]), RULES)["admitted"])
 
     def test_tier3_never_admits(self):
-        t3 = [{"signal_type": "generic_ai_marketing", "tier": "tier3"}] * 3
+        t3 = [{"signal_type": "generic_marketing", "tier": "tier3"}] * 3
         self.assertFalse(rc.check(receipt(signals=t3), RULES)["admitted"])
 
     def test_unknown_headcount_blocks_claim(self):
@@ -82,7 +82,7 @@ class RouteCandidateTests(unittest.TestCase):
 
     def test_icp_rules_load(self):
         self.assertEqual(RULES["vertical_rank"]["professional_services"], 1)
-        self.assertIn("coding_assistance_only_requirement", RULES["hard_dq"])
+        self.assertIn("unsupported_service_requirement", RULES["hard_dq"])
         self.assertIn("existing_solution_meets_need", RULES["recoverable_dq"])
 
     def test_vertical_rank_emitted(self):
@@ -97,9 +97,9 @@ class RouteCandidateTests(unittest.TestCase):
             rc.check(receipt(vertical="fintech"), RULES)
 
     def test_hard_disqualifier_blocks_claim(self):
-        out = rc.check(receipt(disqualifiers=["coding_assistance_only_requirement"]), RULES)
+        out = rc.check(receipt(disqualifiers=["unsupported_service_requirement"]), RULES)
         self.assertEqual((out["route"], out["claimable"], out["hard_disqualifiers"]),
-                         ("claim_new", False, ["coding_assistance_only_requirement"]))
+                         ("claim_new", False, ["unsupported_service_requirement"]))
 
     def test_recoverable_blocker_reported_not_blocking(self):
         out = rc.check(receipt(disqualifiers=["existing_solution_meets_need"]), RULES)

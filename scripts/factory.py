@@ -17,6 +17,17 @@ def write(path, value):
     Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
 
 
+def task_status_map(outreach):
+    """Reviewed provider status -> normalized task state; no inferred defaults."""
+    mapping = outreach.get("task_status_map")
+    if not isinstance(mapping, dict) or any(
+            not isinstance(native, str) or not native.strip() or
+            not isinstance(state, str) or state not in ("completed", "open", "cancelled")
+            for native, state in mapping.items()):
+        raise ValueError("outreach.task_status_map must map provider statuses to completed, open or cancelled")
+    return mapping
+
+
 def frontmatter(shared=SHARED):
     text = (Path(shared) / "icp.md").read_text()
     if not text.startswith("---\n") or "\n---\n" not in text[4:]:
@@ -79,6 +90,7 @@ def validate_examples(root=ROOT):
     signals = read(shared / "taxonomy.example.json")["signals"]
     fm = json.loads((shared / "icp.example.md").read_text().split("---", 2)[1])
     errors = []
+    task_status_map(pol["outreach"])
     if pol.get("schema_version") != 2 or pol.get("mode") != "example":
         errors.append("example policy must be schema 2 in example mode")
     if pol["adoption"]["enabled"] or pol["arr_growth"]["enabled"] or pol["arr_growth"]["email_template"] is not None:
@@ -96,6 +108,8 @@ def validate_examples(root=ROOT):
             errors.append("invalid example signal freshness")
         if signal.get("approved") is not None:
             errors.append("example signals must be unapproved")
+        if not isinstance(signal.get("example_queries"), list) or any(not isinstance(q, str) or not q.strip() for q in signal["example_queries"]):
+            errors.append("example signals need an example_queries list")
         bound.update(signal["claim_ids"])
     if bound != set(claim_ids):
         errors.append("example bindings must reference every claim and no unknown claims")

@@ -110,7 +110,7 @@ class FreshInstall(unittest.TestCase):
         write(proposal / "claims.json", claims)
         names = ("claims.json", "taxonomy.json", "icp.md")
         before = {name: digest(self.shared / name) for name in names}
-        report = self.cli("refresh_tracks", "--wiki", source, "--revision", revision, "--shared", proposal,
+        report = self.cli("refresh_tracks", "--source", source, "--revision", revision, "--shared", proposal,
                           "--stage", post, "--approve-rows", "csv_export", "--approve-signals",
                           "reporting_initiative,paid_individuals_present", "--approve-persona-cares", "--stamp")
         self.assertEqual(report["broken_rows"], [])
@@ -121,7 +121,7 @@ class FreshInstall(unittest.TestCase):
         self.review_and_complete("signal-refresh", ["source-report.json"] + ["postimages/" + name for name in names],
                                  {"A1": {name: digest(post / name) for name in names}},
                                  {name: post / name for name in names})
-        report = self.cli("refresh_tracks", "--wiki", source, "--revision", revision)
+        report = self.cli("refresh_tracks", "--source", source, "--revision", revision)
         self.assertTrue(report["unchanged"])
         self.assertEqual(report["unstamped"], [])
         self.cli("build_pairings")
@@ -136,8 +136,10 @@ class FreshInstall(unittest.TestCase):
         self.cli("build_pairings")
         self.cli("build_pairings", "--check")
         routes = json.loads((self.root / "scripts/wrapper-contract.json").read_text())["commands"]
-        self.assertEqual(set(routes), {"signal-scan", "signal-prospector", "signal-user-scan", "signal-outreach",
+        self.assertEqual(set(routes), {"prospect-setup", "signal-scan", "signal-prospector", "signal-user-scan", "signal-outreach",
                                       "signal-followup", "signal-arr-growth", "signal-refresh"})
+        # Guided setup covers product and service businesses in test_setup.py.
+        routes.pop("prospect-setup")
         for name in routes:
             self.cli("runs", "init", name, name)
             self.state(name, "draft")

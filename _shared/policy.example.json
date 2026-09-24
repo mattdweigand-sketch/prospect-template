@@ -55,6 +55,7 @@
       "verified enrichment"
     ],
     "activity_lookback_days": 30,
+    "task_status_map": {},
     "suppressing_task_subtypes": [
       "Email",
       "Call"

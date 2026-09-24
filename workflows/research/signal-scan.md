@@ -7,7 +7,7 @@ Research and qualification are read-only. This workflow creates no messages.
 
 - Working: output/{run-id}/request.md; only an explicitly named source run.
 - Reference: workflows/run.md, _shared/rules.md; policy.json identity, scan, routing and outreach.activity_lookback_days; taxonomy.json tier 1/2 web entries; adapters.md CRM account, opportunity and task reads and public fetch.
-- Skip: claims.json, private adoption and billing data, mail, Slack, knowledge repositories and other accounts. The public report may continue without CRM, but must say ownership and activity are unverified and cannot hand off an actionable outreach bundle.
+- Skip: claims.json, private adoption and billing data, mail, team chat, knowledge repositories and other accounts. The public report may continue without CRM, but must say ownership and activity are unverified and cannot hand off an actionable outreach bundle.
 
 ## Process
 

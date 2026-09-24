@@ -64,7 +64,7 @@ def expected(root=ROOT):
     for name, row in routes.items():
         body = (
             f"Read `AGENTS.md`, `CONTEXT.md`, `{row['workspace']}`, then `{row['workflow']}` "
-            "from this repository or its installed Project Files. Follow that workflow's Load / Skip list.\n\n"
+            "from the installed workspace, preserving relative paths. Follow that workflow's Load / Skip list.\n\n"
             "Generated from `scripts/wrapper-contract.json`. Behavior belongs to the linked workflow; "
             "this pointer grants no approval.\n"
         )

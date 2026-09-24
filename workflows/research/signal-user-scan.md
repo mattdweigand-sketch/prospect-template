@@ -1,13 +1,15 @@
 # Organization adoption scan
 
 Use for aggregate adoption facts about one named, owned CRM account.
-This optional workflow requires a reviewed private-data adapter.
+This optional subscription-business module requires a reviewed private-data
+adapter and a product with individual paid users and organization subscriptions.
+It is not a prerequisite for public research or core outreach.
 
 ## Load / Skip
 
 - Working: output/{run-id}/request.md and its named account.
 - Reference: workflows/run.md, _shared/rules.md; policy.json identity and adoption; adapters.md CRM resolution and adoption_lookup contract.
-- Skip: public signal search, claims, mail, Slack, billing growth, other accounts and every user-level field. A missing/disabled adapter stops this workflow with an explicit gap.
+- Skip: public signal search, claims, mail, team chat, billing growth, other accounts and every user-level field. A missing/disabled adapter stops this workflow with an explicit gap.
 
 ## Process
 

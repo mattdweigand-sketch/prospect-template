@@ -15,15 +15,15 @@ import evidence_gate as gate
 
 POLICY = SHARED / "policy.json"
 TODAY = date(2026, 9, 21)
-PAGE = ("Acme Corp today announced the appointment of Jane Doe as Chief AI Officer.\n"
-        "\u201cWe will deploy generative AI across every research workflow,\u201d Doe said.")
+PAGE = ("Acme Corp today announced the appointment of Jane Doe as Chief Operating Officer.\n"
+        "\u201cWe will deploy generative operations across every research workflow,\u201d Doe said.")
 
 
 def receipt(**over):
     base = {"account_name": "Acme Corp", "account_aliases": ["Acme", "Jane Doe"], "account_domain": "example.org",
             "source_url": "https://example.org/news", "published_date": "2026-09-01",
-            "quote": "appointment of Jane Doe as Chief AI Officer", "evidence_subject": "Acme Corp",
-            "signal_type": "ai_exec_appointment", "quote_speaker": "account"}
+            "quote": "appointment of Jane Doe as Chief Operating Officer", "evidence_subject": "Acme Corp",
+            "signal_type": "operations_leader_appointment", "quote_speaker": "account"}
     base.update(over)
     return base
 
@@ -43,7 +43,7 @@ class EvidenceGate(unittest.TestCase):
         self.assertNotIn("warnings", out["bundle"])
 
     def test_quote_with_curly_quotes_and_line_break_matches(self):
-        r = receipt(quote='"We will deploy generative AI across every research workflow," Doe said.',
+        r = receipt(quote='"We will deploy generative operations across every research workflow," Doe said.',
                     evidence_subject="Jane Doe")
         self.assertEqual(self.run_gate(r)[0], 0)
 
@@ -52,7 +52,7 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual((code, out["reason"]), (1, "quote_not_in_page"))
 
     def test_quote_too_short(self):
-        code, out = self.run_gate(receipt(quote="Chief AI Officer"))
+        code, out = self.run_gate(receipt(quote="Chief Operating Officer"))
         self.assertEqual((code, out["reason"]), (1, "quote_too_short"))
 
     def test_subject_not_account_owned(self):
@@ -68,7 +68,7 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual(out["freshness_days"], 90)
 
     def test_tier3_never_qualifies(self):
-        code, out = self.run_gate(receipt(signal_type="generic_ai_marketing"))
+        code, out = self.run_gate(receipt(signal_type="generic_marketing"))
         self.assertEqual((code, out["reason"]), (1, "tier3_never_qualifies"))
 
     def test_private_or_unconfigured_signal_source_cannot_qualify(self):
@@ -76,7 +76,7 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual((code, out["reason"]), (1, "signal_source_not_web"))
         for source in (None, "", "warehouse"):
             with self.subTest(source=source):
-                self.types["ai_exec_appointment"]["source"] = source
+                self.types["operations_leader_appointment"]["source"] = source
                 code, out = self.run_gate(receipt())
                 self.assertEqual((code, out["reason"]), (1, "signal_source_not_web"))
 
@@ -146,8 +146,8 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual((code, out["reason"]), (2, "quote_speaker_not_allowed"))
 
     def test_third_party_exec_statement_warns(self):
-        r = receipt(signal_type="exec_ai_statements", quote_speaker="third_party", evidence_subject="Jane Doe",
-                    quote="We will deploy generative AI across every research workflow")
+        r = receipt(signal_type="executive_statements", quote_speaker="third_party", evidence_subject="Jane Doe",
+                    quote="We will deploy generative operations across every research workflow")
         code, out = self.run_gate(r)
         self.assertEqual(code, 0)
         self.assertEqual(out["bundle"]["warnings"], ["third_party_paraphrase"])

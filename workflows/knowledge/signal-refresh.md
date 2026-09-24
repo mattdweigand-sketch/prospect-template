@@ -1,7 +1,11 @@
 # Refresh approved claims
 
-This is the only workflow that reads the configured upstream knowledge source.
-It prepares exact local factory changes; the source repository remains read-only.
+Refresh the source established by prospect-setup: an upstream repository or a
+retained private material snapshot. Prepare exact local factory changes; the
+source repository remains read-only. New supplied materials go through setup.
+An optional contradiction source uses the versioned JSON register defined in
+_shared/adapters.example.md. Unsupported formats stop verification; an
+unconfigured register is not evidence that no contradictions exist.
 
 ## Load / Skip
 
@@ -12,10 +16,10 @@ It prepares exact local factory changes; the source repository remains read-only
 ## Process
 
 1. Fetch the configured source with the configured clone_depth into an isolated temporary directory. Resolve the current source revision to a full Git commit. If the previous claims.source_revision is outside shallow history, fetch that exact history read-only or report an unresolved comparison; never silently reset the baseline. The script itself performs no network operations.
-2. Run `python3 scripts/refresh_tracks.py --wiki SOURCE_CLONE --revision COMMIT`. It reads **committed blobs at that revision**, not the clone's working-tree files. The report names head/date, prior source revision, broken evidence, missing pages, changed content/watch pages, contradiction flags and unstamped units. End with one line only when unchanged and all unstamped/broken/missing/missing-watch/contradiction lists are empty.
+2. Run `python3 scripts/refresh_tracks.py --source SOURCE_CLONE --revision COMMIT`. It reads **committed blobs at that revision**, not the clone's working-tree files. The report names head/date, prior source revision, broken evidence, missing pages, changed content/watch pages, contradiction flags and unstamped units. End with one line only when unchanged and all unstamped/broken/missing/missing-watch/contradiction lists are empty.
 3. Address unstamped units first: a row, signal or persona_cares changed since its approved hash. Propose approve-as-is, a precise revision or revert; a stale stamp never grants permission. For changed ICP watch pages, read the configured persona/ICP section and propose only justified persona/row edits. For open contradictions, read both claims and propose a limit, hold or reasoned no-change. An absent configured watch page is a gap to resolve, not evidence of no contradictions.
 4. For each broken row/missing page, inspect the pinned revision and propose replacement verbatim evidence, a corrected source_reference or removal. A row without a defensible evidence sentence at that commit is removed/held, never reconstructed from memory. Deleted and renamed watch paths must be examined; they can invalidate previous assumptions.
-5. Read changed customer stories, learnings and product pages. Skip benchmark-only, infrastructure-only and redundant claims. Each candidate needs one verbatim sentence proving something useful to a buyer after a signal. Cap additions at refresh.max_new_rows; record skipped pages and reasons.
+5. Read changed pages in the configured source watch paths, including relevant product/service documentation and customer evidence. Skip redundant claims and pages without an evidence-backed connection to the configured buyer's work. Each candidate needs one verbatim sentence supporting something useful after a signal. Cap additions at refresh.max_new_rows; record skipped pages and reasons.
 6. Each row proposal includes id, status, kind (reported_example, product_capability, inference or evaluation_advice), claim, limit, track, evidence, source_reference, verticals, personas, proof{name, external_ok}, approval_reference and approved stamp postimage. Claim strength must match the evidence; limit bounds what an email may not imply. Track is one concise sentence in the configured approved voice, within claim/limit, without copying eight evidence words. No invented product claims, numbers or proof names. A proof is externally nameable only with explicit evidence and review that it is a public customer story.
 7. Use existing ICP persona/vertical IDs and bind **every new row** to at least one taxonomy claim_ids list. There are no new vertical-only rows. Propose creates_work, target_titles, claim_ids or persona_cares changes as separate numbered items. Use natural wording within each claim and limit.
 8. Stage complete proposed factory files in output/{run-id}/proposal/. Do not alter active _shared files. Validate evidence against the pinned source using `--shared output/RUN_ID/proposal`. Prepare proposed stamps only in a fresh separate destination using `--stage output/RUN_ID/postimages --approve-rows EXACT_IDS --approve-signals EXACT_IDS --approve-persona-cares --stamp`, using only the applicable flags. These flags prepare proposed bytes; they do not grant approval. Unknown/wildcard unit IDs and active-factory staging are rejected. Leave every unselected unit's stamp untouched.

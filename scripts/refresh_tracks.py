@@ -17,15 +17,14 @@ import approval
 import factory
 
 SHARED = factory.SHARED
-WIKILINK = re.compile(r"\[\[([^\]|#]+)")
 
 
 def norm(value):
     return re.sub(r"\s+", " ", value or "").strip().lower()
 
 
-def git(wiki, *args):
-    result = subprocess.run(["git", "-C", str(wiki), *args], capture_output=True, text=True)
+def git(source, *args):
+    result = subprocess.run(["git", "-C", str(source), *args], capture_output=True, text=True)
     if result.returncode:
         raise ValueError(result.stderr.strip() or "git command failed")
     return result.stdout.strip()
@@ -38,21 +37,21 @@ def source_path(root, ref):
     return str(Path(root) / ref)
 
 
-def page_at(wiki, revision, root, ref):
+def page_at(source, revision, root, ref):
     path = source_path(root, ref)
-    tree = git(wiki, "ls-tree", revision, "--", path)
+    tree = git(source, "ls-tree", revision, "--", path)
     if not tree:
         return None
     if not tree.startswith("100644 blob ") and not tree.startswith("100755 blob "):
         raise ValueError("source reference must identify a regular committed file")
-    return git(wiki, "show", f"{revision}:{path}")
+    return git(source, "show", f"{revision}:{path}")
 
 
-def verify_rows(rows, wiki_root):
+def verify_rows(rows, source_root):
     """Local synthetic-fixture helper. Production reports use page_at at the pinned commit."""
     broken, missing = [], []
     for row in rows:
-        page = factory.relative_path(wiki_root, row["source_reference"])
+        page = factory.relative_path(source_root, row["source_reference"])
         if not page.is_file():
             missing.append({"id": row["id"], "source_reference": row["source_reference"]})
         elif not row.get("evidence") or norm(row["evidence"]) not in norm(page.read_text()):
@@ -80,17 +79,39 @@ def changed_watch_files(name_status, source_root, watch_files):
 
 
 def contradiction_flags(text, rows):
-    open_part = text.split("## Open", 1)[-1].split("## Resolved", 1)[0]
+    """Validate the optional neutral JSON register; match exact source paths.
+
+    {schema_version: 1, contradictions: [{id, status: open|resolved, summary,
+    source_references: [paths relative to claims.source_root]}]}. Malformed or
+    unsupported input raises instead of reporting an empty/clean register.
+    """
+    try:
+        doc = json.loads(text)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("contradictions must use the version 1 JSON register") from exc
+    if not isinstance(doc, dict) or type(doc.get("schema_version")) is not int or doc["schema_version"] != 1 or not isinstance(doc.get("contradictions"), list):
+        raise ValueError("contradictions must use schema_version 1 and a contradictions list")
     refs = {}
     for row in rows:
-        refs.setdefault(Path(row["source_reference"]).stem.lower(), []).append(row)
-    out = []
-    for entry in re.split(r"^### ", open_part, flags=re.M)[1:]:
-        title = entry.splitlines()[0].strip()
-        if title.lower().startswith("[status: open]"):
-            for link in {Path(x.strip().lower()).stem for x in WIKILINK.findall(entry)}:
-                for row in refs.get(link, []):
-                    out.append({"id": row["id"], "source_reference": row["source_reference"], "contradiction": title.split("]", 1)[-1].strip()})
+        refs.setdefault(source_path("", row["source_reference"]), []).append(row)
+    out, seen = [], set()
+    for entry in doc["contradictions"]:
+        if not isinstance(entry, dict) or any(not isinstance(entry.get(k), str) or not entry[k].strip() for k in ("id", "status", "summary")):
+            raise ValueError("contradiction entries need nonempty id, status and summary")
+        if entry["id"] in seen or entry["status"] not in ("open", "resolved"):
+            raise ValueError("contradiction IDs must be unique and status must be open or resolved")
+        seen.add(entry["id"])
+        paths = entry.get("source_references")
+        if not isinstance(paths, list) or not paths or any(not isinstance(p, str) or not p.strip() for p in paths):
+            raise ValueError("contradictions need exact source_references")
+        paths = [source_path("", p) for p in paths]
+        if len(paths) != len(set(paths)):
+            raise ValueError("duplicate contradiction source reference")
+        if entry["status"] == "open":
+            for ref in paths:
+                for row in refs.get(ref, []):
+                    out.append({"id": row["id"], "source_reference": row["source_reference"],
+                                "contradiction": entry["summary"], "contradiction_id": entry["id"]})
     return out
 
 
@@ -106,33 +127,34 @@ def load(shared):
     return factory.claim_document(shared), factory.taxonomy(shared), factory.frontmatter(shared), factory.read(shared / "policy.json")["refresh"]
 
 
-def report(wiki, shared=SHARED, revision="HEAD"):
+def report(source, shared=SHARED, revision="HEAD"):
     doc, tax, fm, pol = load(shared)
-    head = git(wiki, "rev-parse", "--verify", f"{revision}^{{commit}}")
+    head = git(source, "rev-parse", "--verify", f"{revision}^{{commit}}")
     prior = doc.get("source_revision")
-    previous = git(wiki, "rev-parse", "--verify", f"{prior}^{{commit}}") if prior else None
+    previous = git(source, "rev-parse", "--verify", f"{prior}^{{commit}}") if prior else None
     root = doc["source_root"]
     source_path(root, "")
     broken, missing = [], []
     for row in doc["claims"]:
-        text = page_at(wiki, head, root, row["source_reference"])
+        text = page_at(source, head, root, row["source_reference"])
         if text is None:
             missing.append({"id": row["id"], "source_reference": row["source_reference"]})
         elif not row.get("evidence") or norm(row["evidence"]) not in norm(text):
             broken.append({"id": row["id"], "source_reference": row["source_reference"]})
     if previous:
-        diff = git(wiki, "diff", "--no-renames", "--name-status", f"{previous}..{head}", "--", root or ".")
+        diff = git(source, "diff", "--no-renames", "--name-status", f"{previous}..{head}", "--", root or ".")
     else:
-        diff = "\n".join("A\t" + p for p in git(wiki, "ls-tree", "--name-only", "-r", head, "--", root or ".").splitlines())
-    contradiction = page_at(wiki, head, root, pol["contradictions_path"]) if pol.get("contradictions_path") else None
+        diff = "\n".join("A\t" + p for p in git(source, "ls-tree", "--name-only", "-r", head, "--", root or ".").splitlines())
+    contradiction = page_at(source, head, root, pol["contradictions_path"]) if pol.get("contradictions_path") else None
     watched = list(dict.fromkeys(pol["watch_paths"] + [p for p in (pol.get("icp_path"), pol.get("contradictions_path")) if p]))
-    missing_watch = [ref for ref in watched if page_at(wiki, head, root, ref) is None]
-    return {"head": head, "head_date": git(wiki, "show", "-s", "--format=%cs", head), "source_revision": prior,
+    missing_watch = [ref for ref in watched if page_at(source, head, root, ref) is None]
+    return {"head": head, "head_date": git(source, "show", "-s", "--format=%cs", head), "source_revision": prior,
             "unchanged": previous == head, "rows": len(doc["claims"]), "broken_rows": broken, "missing_pages": missing,
             "changed_pages": changed_pages(diff, root, pol["watch_dirs"], pol["ignore_pages"]),
             "changed_watch_files": changed_watch_files(diff, root, watched),
             "missing_watch_pages": missing_watch,
-            "contradiction_flags": contradiction_flags(contradiction or "", doc["claims"]),
+            "contradictions_status": "not_configured" if not pol.get("contradictions_path") else "missing" if contradiction is None else "validated",
+            "contradiction_flags": contradiction_flags(contradiction, doc["claims"]) if contradiction is not None else [],
             "unstamped": unstamped(doc, tax, fm)}
 
 
@@ -186,7 +208,7 @@ def approve_persona_cares(shared=SHARED, today=None):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--wiki", type=Path, required=True)
+    ap.add_argument("--source", type=Path, required=True, help="local clone or snapshot of the configured knowledge source")
     ap.add_argument("--shared", type=Path, default=SHARED)
     ap.add_argument("--revision", default="HEAD")
     ap.add_argument("--stage", type=Path, help="new directory for proposed factory postimages; never the active factory")
@@ -196,7 +218,7 @@ def main():
     ap.add_argument("--approve-persona-cares", action="store_true")
     a = ap.parse_args()
     try:
-        rep = report(a.wiki, a.shared, a.revision)
+        rep = report(a.source, a.shared, a.revision)
         mutating = a.stamp or a.approve_rows or a.approve_signals or a.approve_persona_cares
         if mutating and not a.stage:
             raise ValueError("stamp preparation requires --stage; active configuration is never mutated")

@@ -61,7 +61,7 @@ class SafetyBoundaries(unittest.TestCase):
 
     def test_signal_tier_cannot_be_overstated(self):
         with self.assertRaises(ValueError):
-            route_candidate.check(routing.receipt(signals=[{"signal_type": "exec_ai_statements", "tier": "tier1"}]), routing.RULES)
+            route_candidate.check(routing.receipt(signals=[{"signal_type": "executive_statements", "tier": "tier1"}]), routing.RULES)
 
     def test_adoption_needs_owned_account_and_web_tier2(self):
         signals = [{"signal_type": "paid_individuals_present", "tier": "tier2"}] + routing.T2
@@ -117,7 +117,7 @@ class SafetyBoundaries(unittest.TestCase):
             outreach_gate.check(p, outreach.POL, SHARED, outreach.NOW)
 
     def test_fit_mode_block_holds_matrix_gap(self):
-        p = outreach.row_packet("api_embed", "ai_exec_appointment", vertical="legal", persona="technical_evaluator", title="CIO")
+        p = outreach.row_packet("data_exchange", "operations_leader_appointment", vertical="legal", persona="technical_evaluator", title="CIO")
         self.assertFalse(outreach_gate.check(p, outreach.POL, SHARED, outreach.NOW))
         self.assertTrue(outreach_gate.check(p, {**outreach.POL, "fit_mode": "block"}, SHARED, outreach.NOW))
 
@@ -233,9 +233,9 @@ class PinnedRefresh(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
         self.shared = make_shared(self.root / "shared")
-        self.wiki = self.root / "wiki"
-        (self.wiki / "products").mkdir(parents=True)
-        self.page = self.wiki / "products/example.md"
+        self.source_repo = self.root / "knowledge"
+        (self.source_repo / "products").mkdir(parents=True)
+        self.page = self.source_repo / "products/example.md"
         self.source = "\n".join(row["evidence"] for row in factory.claim_document(self.shared)["claims"])
         self.page.write_text(self.source)
         self.git("init", "-q")
@@ -243,32 +243,32 @@ class PinnedRefresh(unittest.TestCase):
         self.git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.com", "commit", "-qm", "synthetic source")
 
     def git(self, *args):
-        return refresh_tracks.git(self.wiki, *args)
+        return refresh_tracks.git(self.source_repo, *args)
 
     def cli(self, *args):
-        return subprocess.run([sys.executable, "-B", str(SCRIPTS / "refresh_tracks.py"), "--wiki", str(self.wiki),
+        return subprocess.run([sys.executable, "-B", str(SCRIPTS / "refresh_tracks.py"), "--source", str(self.source_repo),
                                "--shared", str(self.shared), *map(str, args)], capture_output=True, text=True)
 
     def test_report_reads_commit_not_dirty_working_tree(self):
         self.page.write_text("Changed locally; no supporting evidence.")
-        self.assertEqual(refresh_tracks.report(self.wiki, self.shared)["broken_rows"], [])
+        self.assertEqual(refresh_tracks.report(self.source_repo, self.shared)["broken_rows"], [])
         self.git("add", ".")
         self.git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.com", "commit", "-qm", "remove evidence")
         self.page.write_text(self.source)
-        self.assertEqual(len(refresh_tracks.report(self.wiki, self.shared)["broken_rows"]), 9)
+        self.assertEqual(len(refresh_tracks.report(self.source_repo, self.shared)["broken_rows"]), 9)
 
     def test_cli_stamps_only_staged_postimages(self):
         before = {p.name: p.read_bytes() for p in self.shared.iterdir()}
         denied = self.cli("--stamp")
         self.assertEqual(denied.returncode, 2)
         stage = self.root / "postimages"
-        result = self.cli("--stamp", "--approve-rows", "completed_work", "--stage", stage)
+        result = self.cli("--stamp", "--approve-rows", "report_delivery", "--stage", stage)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertEqual(before, {p.name: p.read_bytes() for p in self.shared.iterdir()})
         self.assertEqual(factory.claim_document(stage)["source_revision"], self.git("rev-parse", "HEAD"))
         self.assertEqual(json.loads(result.stdout)["stage_status"], "proposed_only_requires_exact_review")
         for row in factory.claim_document(stage)["claims"]:
-            if row["id"] != "completed_work":
+            if row["id"] != "report_delivery":
                 original = next(r for r in factory.claim_document(self.shared)["claims"] if r["id"] == row["id"])
                 self.assertEqual(row["approved"], original["approved"])
 
@@ -284,30 +284,50 @@ class PinnedRefresh(unittest.TestCase):
         self.page.symlink_to("../unread-secret.md")
         self.git("add", ".")
         self.git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.com", "commit", "-qm", "symlink")
-        with self.assertRaises(ValueError): refresh_tracks.report(self.wiki, self.shared)
+        with self.assertRaises(ValueError): refresh_tracks.report(self.source_repo, self.shared)
         with self.assertRaises(ValueError): refresh_tracks.source_path("", "../outside")
 
     def test_missing_watch_page_prevents_source_stamp(self):
         pol = factory.read(self.shared / "policy.json")
         pol["refresh"]["watch_paths"] = ["missing-policy.md"]
         factory.write(self.shared / "policy.json", pol)
-        rep = refresh_tracks.report(self.wiki, self.shared)
+        rep = refresh_tracks.report(self.source_repo, self.shared)
         self.assertEqual(rep["missing_watch_pages"], ["missing-policy.md"])
         self.assertEqual(self.cli("--stamp", "--stage", self.root / "bad").returncode, 2)
 
     def test_deleted_watch_file_is_reported(self):
-        self.assertEqual(refresh_tracks.changed_watch_files("D\twiki/personas.md", "wiki", ["personas.md"]), ["personas.md"])
+        self.assertEqual(refresh_tracks.changed_watch_files("D\tknowledge/personas.md", "knowledge", ["personas.md"]), ["personas.md"])
+
+    def test_malformed_contradiction_source_prevents_staged_write(self):
+        pol = factory.read(self.shared / "policy.json")
+        pol["refresh"]["contradictions_path"] = "contradictions.json"
+        factory.write(self.shared / "policy.json", pol)
+        path = self.source_repo / "contradictions.json"
+        path.write_text("# Unsupported source format\n")
+        self.git("add", ".")
+        self.git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.com", "commit", "-qm", "invalid register")
+        stage = self.root / "invalid-register"
+        result = self.cli("--stamp", "--stage", stage)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("version 1 JSON register", result.stdout)
+        self.assertFalse(stage.exists())
+        path.write_text('{"schema_version":1,"contradictions":[]}')
+        self.git("add", ".")
+        self.git("-c", "user.name=Synthetic", "-c", "user.email=synthetic@example.com", "commit", "-qm", "valid register")
+        report = refresh_tracks.report(self.source_repo, self.shared)
+        self.assertEqual(report["contradictions_status"], "validated")
+        self.assertEqual(report["contradiction_flags"], [])
 
     def test_pairings_reject_unknown_and_unreachable_claims(self):
         _, errors = build_pairings.build(self.shared)
         self.assertEqual(errors, [])
         tax = factory.read(self.shared / "taxonomy.json")
         for signal in tax["signals"]:
-            signal["claim_ids"] = [rid for rid in signal["claim_ids"] if rid != "api_embed"]
+            signal["claim_ids"] = [rid for rid in signal["claim_ids"] if rid != "data_exchange"]
         tax["signals"][0]["claim_ids"].append("missing-row")
         factory.write(self.shared / "taxonomy.json", tax)
         _, errors = build_pairings.build(self.shared)
-        self.assertIn("unreachable claim: api_embed", errors)
+        self.assertIn("unreachable claim: data_exchange", errors)
         self.assertIn("unknown claim: missing-row", errors)
 
     def test_examples_remain_unapproved_and_private_capabilities_disabled(self):
