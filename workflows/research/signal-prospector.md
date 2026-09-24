@@ -1,31 +1,32 @@
----
-type: workflow
-command: signal-prospector
-mode: write
----
-# signal-prospector
+# Prospect discovery and account claims
 
-Discover candidate accounts, resolve CRM ownership, and propose exact account claims.
+Discover candidate accounts, verify their evidence and territory, and propose exact CRM account/contact changes.
 
 ## Load / Skip
-- Working: output/{run-id}/request.md and only its explicitly named inputs. On resumption, read that run's 01_review.md, review.json and 02_result.json.
-- Reference: _shared/policy.json (identity and the sections named below), _shared/rules.md, _shared/adapters.md; load _shared/icp.md, _shared/taxonomy.json and _shared/claims.json only where a step names them.
-- Lifecycle: [workflows/run.md](../run.md). Required adapter capabilities: crm, web; contact enrichment optional.
-- Skip: other runs, other workflow families, private example data, and unrelated factory sections. A missing adapter is a named limitation or blocks its dependent effect.
+
+- Working: output/{run-id}/request.md, named territory and filters.
+- Reference: workflows/run.md, _shared/rules.md; policy.json identity, scan, routing, prospector and adoption enablement; taxonomy.json; icp.md frontmatter; adapters.md public research, CRM claim mappings, verified enrichment and optionally adoption_territory.
+- Skip: mail, Slack, billing growth, claims.json and the knowledge source. If adoption is disabled, continue public discovery and show that source as unavailable.
 
 ## Process
-1. Load the approved _shared/icp.md, taxonomy and configured territory limits. Find at most policy.prospector.max_candidates candidates from public signals. An optional adoption source must use the aggregate privacy contract of signal-user-scan.
-2. For each candidate, use the signal-scan qualification process and obtain dated headcount or other territory evidence. Apply the configured admission rule and disqualifiers. Unknown qualification data produces a hold, not a guessed fit.
-3. Resolve domain matches, owner activity and open Opportunities in live CRM. Route new, transferable, already-owned, active-deal and owned-elsewhere candidates by policy.routing. Existing CRM state is the deduplication source; do not build a parallel account ledger.
-4. Find a professional contact only when needed for a proposed claim. Use existing CRM records or verified enrichment; do not construct email addresses from patterns.
-5. Propose Account creation or explicitly permitted owner transfer and any Contact creation as distinct numbered effects with exact fields and source evidence. An uncertain contact can leave an Account-only proposal.
-6. After approval, repeat the domain and owner checks before applying. A new match or changed owner invalidates the affected proposal. Verify each created or transferred record. This workflow does not create Opportunities or draft outreach.
+
+1. Print and run one discovery query per tier 1/2 **web** type, using example_queries without a company name. Prefer fresh evidence, named executive actions and distinct companies; remove internal domains/subdomains.
+2. Optionally run the reviewed adoption_territory adapter read-only for the owner, complete data date, territory and prospector.adoption_candidate_rows. Wait for confirmed success. It returns only aggregate leads on already-owned accounts. A paid_individuals_present lead admits only alongside one qualified **web Tier 2** signal found for that account in this run; search those companies too. No user-level fields, counts or unrelated warehouse reads.
+3. Keep at most prospector.max_candidates candidates, preferring Tier 1 evidence and named executive actions. Record sources searched, companies seen, candidates retained and gaps. This cap is not an excuse to fabricate coverage.
+4. For each public signal, fetch the full page, save its receipt/text/read timestamp, and run evidence_gate.py as specified in signal-scan's receipt contract. Only exit 0 bundles count; read semantic fit against the selected taxonomy definition. Admission is one Tier 1 or two **distinct signal types** in Tier 2. Repeated quotes about the same type count once; Tier 3 never admits.
+5. Verify buying-entity headcount from the first dated reliable hit in prospector.headcount_sources order. Keep the source/date and entity scope; unknown stays null. Assign a supported icp.md vertical or null and only evidenced disqualifier IDs. Hard disqualifiers prevent claims; recoverable blockers remain visible.
+6. Query CRM by both name and website domain. Read account ID/name/website, owner ID/name/active status, open opportunities using the configured predicate, and all contacts on the matched account. Resolve multiple matches before proposing a write. Do not treat a replica owner, a missing read or an omitted opportunity list as current CRM state.
+7. Save a routing receipt (scripts/route_candidate.py docstring) and run `python3 scripts/route_candidate.py --receipt output/RUN_ID/candidate.json`. Report admission, territory, vertical rank, hard/recoverable blockers, route and claimable. Any open deal routes active_deal before ownership logic. Unknown/out-of-territory headcount cannot be claimed. Other active owners route owned_elsewhere; only configured house owners or inactive owners are transferable. Already-owned/no-deal accounts route scan, including all adoption leads, and are never claimed again.
+8. Only for claimable candidates, find at most one contact. Prefer the named signal person, then the configured contact_email_sources order: existing CRM contact followed by verified enrichment. Inspect no more than prospector.max_people_per_account people. A missing verified address means account-only; never infer a name or build an email pattern. An existing contact is reused, not recreated.
+9. Propose each permitted effect separately: account creation, exact owner transfer, or contact creation attached to that account. Use adapters.md's allowed fields and show **every native field/value and its source**. A transfer includes current owner/name/status and inactive/house justification. A new-account contact references the account effect as a dependency; explain how the returned ID fills that one field. No arbitrary CRM fields or other write types are allowed.
+10. After exact review under workflows/run.md, refresh the account/domain duplicate search, owner, opportunities, headcount evidence and contact match. If any preimage changes, revise the affected proposal. Apply one approved record per call, only after its dependencies verify. Query every returned ID and compare every approved field. Report uncertainty or mismatch without silent repair or blind retries.
 
 ## Outputs and readiness
-- output/{run-id}/01_review.md contains the requested review and exact numbered effects, source coverage, evidence and unresolved items.
-- Ready when the scope is reconciled, findings have source references, required checks above pass, and gaps cannot be mistaken for checked evidence. Unsupported effects are withheld explicitly.
-- output/{run-id}/review.json records the user's review of this exact revision.
-- output/{run-id}/02_result.json follows the shared run contract. Every approved effect has an outcome and any provider/readback references.
+
+The review has run/date, search coverage, all candidate routes with supporting quotes/dates/links, headcount source, blockers and exact numbered `Effect` proposals. Declare page/receipt/bundle/routing outputs and permissible CRM read receipts as artifacts. Missing sources keep the affected effect in draft; no claimable candidates is a finding, not proof the territory is empty.
+
+After application, 02_result.json accounts for each approved effect and readback. Hand off verified claims and their qualified bundles by exact run/reference to outreach on request. CRM remains the account/contact record; the local review is not a prospect ledger.
 
 ## Human check
-Check admission evidence, territory, ownership and exact claim fields for each candidate. Approve only the listed effects; discovery never grants ownership.
+
+Review entity, signal fit, territory, ownership, verified contact source and every field. Each effect needs approval, which may cover an exact list together. Claim approval grants no permission to draft or contact. Never create opportunities, tasks, email drafts or messages; never merge/delete records or continue a claim on an open deal.

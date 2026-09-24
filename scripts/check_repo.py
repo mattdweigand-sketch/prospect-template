@@ -7,14 +7,16 @@ import subprocess
 import sys
 
 from wrappers import ROOT, load_routes, render
+import factory
 
-PRIVATE = {"_shared/policy.json", "_shared/adapters.md", "_shared/icp.md", "_shared/taxonomy.json", "_shared/claims.json"}
+PRIVATE = {"_shared/pairings.md", "_shared/policy.json", "_shared/adapters.md", "_shared/icp.md", "_shared/taxonomy.json", "_shared/claims.json"}
 
 
 def public_files(root):
     if (root / ".git").is_dir():
         proc = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=root, capture_output=True, check=True)
-        return sorted({Path(p) for p in proc.stdout.decode().split("\0") if p})
+        return sorted({Path(p) for p in proc.stdout.decode().split("\0")
+                       if p and ((root / p).exists() or (root / p).is_symlink())})
     return sorted(p.relative_to(root) for p in root.rglob("*") if p.is_file()
                   and not any(x in (".git", "output", "__pycache__", ".venv") for x in p.relative_to(root).parts)
                   and str(p.relative_to(root)) not in PRIVATE)
@@ -22,6 +24,7 @@ def public_files(root):
 
 def check(root=ROOT):
     errors = render(root, check=True)
+    errors.extend(factory.validate_examples(root))
     routes = load_routes(root)
     if len((root / "AGENTS.md").read_text().splitlines()) >= 60:
         errors.append("AGENTS.md should stay below 60 lines")
@@ -60,8 +63,8 @@ def check(root=ROOT):
                 if "{" not in target and not (path.parent / target).exists():
                     errors.append(f"broken link in {rel}: {target}")
         for address in re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text):
-            domain = address.split("@")[1]
-            if domain not in ("example.com", "example.org", "example.net"):
+            domain = address.split("@")[1].lower()
+            if not any(domain == d or domain.endswith("." + d) for d in ("example.com", "example.org", "example.net")):
                 errors.append(f"non-example email in {rel}")
         if re.search(r"\b(?:005|001|003|006)[a-zA-Z0-9]{12}(?:[a-zA-Z0-9]{3})?\b", text):
             errors.append("CRM identifier in " + str(rel))

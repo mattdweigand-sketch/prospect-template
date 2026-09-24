@@ -1,31 +1,29 @@
----
-type: workflow
-command: signal-user-scan
-mode: read
----
-# signal-user-scan
+# Organization adoption scan
 
-Produce an organization-level adoption finding using a configured private-data adapter.
+Use for aggregate adoption facts about one named, owned CRM account.
+This optional workflow requires a reviewed private-data adapter.
 
 ## Load / Skip
-- Working: output/{run-id}/request.md and only its explicitly named inputs. On resumption, read that run's 01_review.md, review.json and 02_result.json.
-- Reference: _shared/policy.json (identity and the sections named below), _shared/rules.md, _shared/adapters.md; load _shared/icp.md, _shared/taxonomy.json and _shared/claims.json only where a step names them.
-- Lifecycle: [workflows/run.md](../run.md). Required adapter capabilities: crm, adoption.
-- Skip: other runs, other workflow families, private example data, and unrelated factory sections. A missing adapter is a named limitation or blocks its dependent effect.
+
+- Working: output/{run-id}/request.md and its named account.
+- Reference: workflows/run.md, _shared/rules.md; policy.json identity and adoption; adapters.md CRM resolution and adoption_lookup contract.
+- Skip: public signal search, claims, mail, Slack, billing growth, other accounts and every user-level field. A missing/disabled adapter stops this workflow with an explicit gap.
 
 ## Process
-1. Confirm the Account belongs to the configured owner and has no open Opportunity. Resolve a single domain and account ID.
-2. Require the adoption adapter and its permitted fields in _shared/adapters.md. Without it, report unavailable; never substitute inferred usage from public interest or employee profiles.
-3. Read aggregate organization-level adoption categories through the configured data-through date. Exclude user names, email addresses, seat counts, query content and individual activity timing from the handoff bundle.
-4. Write output/{run-id}/adoption.json containing only account_name, account_id, account_domain, data_through_date, adoption and source_reference. Adoption must be org_adopted, individuals_only, none_found or unknown. Unknown and none_found support no adoption claim.
-5. Verify every field against the configured source and permissions. In the review, distinguish the source's data date from the time checked, and give only the approved aggregate statement for the observed category.
+
+1. Resolve one CRM account by supplied ID or name/domain; read ID, name, website, owner/active status and open opportunities. Zero or multiple matches require the user to select an ID. Continue only for identity.owner_id with no open deal; otherwise report `owned_elsewhere` or `active_deal`.
+2. Normalize its website to a lowercase domain, removing scheme, www, path and port. Stop for a missing domain or any configured internal domain/subdomain. Confirm the CRM account/domain pair before querying.
+3. Use only the configured adoption_lookup adapter, read-only. Bind account ID, normalized domain and the completed data date (today in identity.timezone minus adoption.data_lag_days). For asynchronous queries, wait for confirmed success before reading results. Submission, pending, failure and incomplete pagination never mean no adoption.
+4. Expect one aggregate result with explicit mapping coverage. Preserve org subscription/payment booleans, permitted service/platform categories, mapped-org count and paid-individual **presence only**. Split provider comma lists into string arrays. Multiple mapped organizations may be aggregated if the adapter validates their account mapping; ambiguous cross-account mapping stops. No per-person rows may enter chat or artifacts.
+5. Build exactly adoption.bundle_keys. Set adoption to org_adopted when org_subscribed is true, otherwise individuals_only if paid_individuals_exist, otherwise none_found. Unknown mapping or coverage yields an explicit unknown finding, not false booleans or an actionable category. Keep source_reference an aggregate query receipt, not a link exposing per-user output.
+6. Run `python3 scripts/privacy_check.py --bundle output/RUN_ID/adoption.json`. Exit 0 is required for a clean bundle; fix the offending data on exit 1, never weaken the check. Exit 2 stops. Verify the complete data date and CRM prerequisites independently; the privacy check does not establish those facts.
 
 ## Outputs and readiness
-- output/{run-id}/01_review.md contains the requested read-only deliverable, source coverage, evidence and unresolved items.
-- Declare adoption.json in the review's artifacts list when a bundle is produced; unavailable adapter findings produce no bundle.
-- Ready when the scope is reconciled, findings have source references, required checks above pass, and gaps cannot be mistaken for checked evidence. Unsupported effects are withheld explicitly.
-- output/{run-id}/review.json records the user's review of this exact revision.
-- output/{run-id}/02_result.json follows the shared run contract. Its effects list is empty.
+
+The review names account/CRM ID, owner/status, route, domain, data-through date, aggregate subscription and platform/service categories, paid-individual presence, privacy verdict and the exact bundle. Include the query success reference and read time as separate review metadata, outside the bundle's field allowlist. Declare only the aggregate bundle and permitted aggregate receipts as artifacts.
+
+Only the configured adoption.approved_statements entry for the category may be repeated in outreach. There is no outreach statement for none_found or unknown. Explain that none_found covers the supplied mapping/date and is not proof of absence; an organization may be mapped to a duplicate account. There are no effects.
 
 ## Human check
-Verify the account, data date, permissions and exact aggregate statement. The bundle must not expose individual activity or imply absent evidence proves non-use.
+
+Check entity/domain mapping, data date, aggregate-only content and the approved category sentence. Hand off the reviewed bundle by exact run/reference on request; outreach also requires a qualified public signal. Never add names, emails, titles, seats/user counts, queries, activity timestamps or usage trends, even approximately. Do not expand query columns without a separate reviewed adapter/policy change. No provider writes or message wording occur here.

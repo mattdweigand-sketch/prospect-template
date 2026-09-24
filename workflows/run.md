@@ -32,7 +32,8 @@ reviewer and exactly approved effect IDs in output/{run-id}/review.json using:
 
 Omit --effects for a reviewed read-only deliverable. This command records an
 existing approval; running it is never a way to obtain one. The snapshot covers
-the review, request, selected contract and configured policy inputs. Changes
+the review, request, selected contracts, configured policy inputs, route registry,
+run-state implementation and selected helper dependencies. Changes
 invalidate it. Source files referenced by the review must be rechecked before
 effects if their contents could change; their paths alone are not identity.
 

@@ -66,6 +66,59 @@ class WorkspaceTests(unittest.TestCase):
         policy.write_text(policy.read_text() + "\n")
         self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_stale")
 
+    def test_selected_helper_edit_invalidates_review(self):
+        self.ready()
+        review = self.approve()
+        helper = wrappers.load_routes(self.root)[self.command]["checks"][-1]
+        self.assertIn(helper, review["snapshot"])
+        target = self.root / helper
+        target.write_text(target.read_text() + "\n# Changed gate\n")
+        self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_stale")
+
+    def test_unselected_helper_does_not_expand_run_context(self):
+        self.ready()
+        review = self.approve()
+        self.assertNotIn("scripts/arr_growth_gate.py", review["snapshot"])
+        target = self.root / "scripts/arr_growth_gate.py"
+        target.write_text(target.read_text() + "\n# Unrelated gate\n")
+        self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_current")
+
+    def test_helper_route_escape_rejected(self):
+        contract = self.root / "scripts/wrapper-contract.json"
+        doc = json.loads(contract.read_text())
+        doc["commands"][self.command]["checks"] = ["scripts/../../outside.py"]
+        contract.write_text(json.dumps(doc))
+        with self.assertRaises(ValueError):
+            wrappers.load_routes(self.root)
+
+    def test_synthetic_signal_to_outreach_review(self):
+        from gate_fixtures import make_shared
+        import evidence_gate
+        import outreach_gate
+        import test_evidence_gate as evidence
+        import test_outreach_gate as outreach
+        shared = make_shared(self.root / "_shared")
+        request = self.path / "request.md"
+        request.write_text(request.read_text().replace("workflow: signal-scan", "workflow: signal-outreach"))
+        policy, types = evidence_gate.load_taxonomy(shared / "policy.json")
+        code, qualified = evidence_gate.grade(evidence.receipt(), evidence.PAGE, policy, types, outreach.NOW.date(), outreach.NOW)
+        self.assertEqual(code, 0)
+        packet = outreach.pk()
+        packet["bundle"] = qualified["bundle"]
+        self.assertEqual(outreach_gate.check(packet, outreach.POL, shared, outreach.NOW), [])
+        (self.path / "source.txt").write_text(evidence.PAGE)
+        (self.path / "bundle.json").write_text(json.dumps(qualified))
+        (self.path / "packet.json").write_text(json.dumps(packet))
+        review = self.path / "01_review.md"
+        review.write_text('---\nstatus: ready\nartifacts: ["source.txt", "bundle.json", "packet.json"]\n---\n\n## Effect A1\n'
+                          + "Synthetic unsent draft, no provider called.\n"
+                          + json.dumps({"to": packet["recipient"]["email"], **packet["draft"]}, indent=2) + "\n")
+        self.approve()
+        self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_current")
+        packet["draft"]["body"] += " An unreviewed assertion."
+        (self.path / "packet.json").write_text(json.dumps(packet))
+        self.assertEqual(runs.status(self.root, self.path.name)["state"], "review_stale")
+
     def test_declared_missing_artifact_prevents_review_record(self):
         self.ready()
         review = self.path / "01_review.md"

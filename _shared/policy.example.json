@@ -5,23 +5,14 @@
     "timezone": "UTC",
     "internal_domains": [
       "example.com"
-    ]
-  },
-  "followup": {
-    "default_next_date_days": 2,
-    "sent_mail_hold_days_cold": 2,
-    "sent_mail_hold_days_active": 1,
-    "recycle_after_unanswered": 7,
-    "cooldown_days": 30
+    ],
+    "owner_id": "example-owner"
   },
   "email_voice": {
     "greeting": "Hi {first_name},",
     "closing": "Best,\nSeller",
     "body": "Short, specific, one concrete question",
-    "reply_in_thread": true
-  },
-  "research": {
-    "max_sources": 5
+    "anchor_reference": null
   },
   "review_inputs": [
     "_shared/adapters.md",
@@ -39,7 +30,19 @@
   },
   "prospector": {
     "max_candidates": 5,
-    "admission": "one tier1 or two distinct tier2 signals"
+    "admission": "one tier1 or two distinct tier2 signals",
+    "max_people_per_account": 5,
+    "headcount_sources": [
+      "company filing or annual report",
+      "dated company page",
+      "verified enrichment"
+    ],
+    "contact_email_sources": [
+      "existing CRM Contact",
+      "verified enrichment"
+    ],
+    "adoption_signal_id": "paid_individuals_present",
+    "adoption_candidate_rows": 20
   },
   "outreach": {
     "bundle_max_age_hours": 24,
@@ -50,27 +53,102 @@
       "existing CRM Contact",
       "prior thread with recipient",
       "verified enrichment"
-    ]
+    ],
+    "activity_lookback_days": 30,
+    "suppressing_task_subtypes": [
+      "Email",
+      "Call"
+    ],
+    "subject_max_words": 8,
+    "lint": {
+      "forbidden_phrases": [
+        "excited to share",
+        "thrilled to announce",
+        "game-changer",
+        "unlock",
+        "leverage",
+        "seamless",
+        "robust",
+        "powerful",
+        "delve",
+        "landscape"
+      ],
+      "forbidden_punctuation": [
+        "—"
+      ],
+      "max_body_words": 90,
+      "no_emoji": true,
+      "no_hashtags": true,
+      "no_markdown": true
+    }
   },
   "followup_signal": {
     "due_calendar_days": 7,
-    "growth_due_business_days": 2
+    "growth_due_business_days": 2,
+    "max_tasks": 1,
+    "closed_statuses": [
+      "Completed",
+      "Deferred"
+    ],
+    "task": {
+      "subject": "Follow up: {mail_subject}",
+      "status": "Not Started",
+      "priority": "Normal",
+      "subtype": "Task",
+      "description": "Follow up on reviewed outreach. Mail message {message_id}; thread {thread_id}. signal_type {signal_type}; claim_id {claim_id}."
+    }
   },
   "adoption": {
     "enabled": false,
-    "approved_statements": {}
+    "approved_statements": {},
+    "data_lag_days": 1,
+    "bundle_keys": {
+      "account_name": "str",
+      "account_id": "str",
+      "account_domain": "str",
+      "data_through_date": "str",
+      "mapped_org_count": "int",
+      "org_subscribed": "bool",
+      "org_paying": "bool",
+      "org_service_types": "list",
+      "org_platforms": "list",
+      "paid_individuals_exist": "bool",
+      "adoption": "str",
+      "source_reference": "str"
+    }
   },
   "arr_growth": {
     "enabled": false,
     "window_days": 30,
     "max_accounts": 2,
-    "email_template": null
+    "email_template": null,
+    "data_lag_days": 1,
+    "suppression_days": 30,
+    "candidate_rows": 20,
+    "allowed_platforms": [
+      "web"
+    ]
   },
   "refresh": {
     "source": null,
-    "revision": null,
+    "clone_depth": 300,
+    "watch_dirs": [],
     "watch_paths": [],
+    "ignore_pages": [],
     "icp_path": null,
-    "contradictions_path": null
+    "contradictions_path": null,
+    "max_new_rows": 8
+  },
+  "schema_version": 2,
+  "scan": {
+    "quote_min_words": 5,
+    "max_signals_per_account": 3,
+    "warm_engagement": {
+      "lookback_days": 30,
+      "task_subject_markers": [
+        "Re:"
+      ],
+      "ignored_owner_ids": []
+    }
   }
 }

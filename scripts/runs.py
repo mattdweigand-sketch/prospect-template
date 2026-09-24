@@ -61,6 +61,8 @@ def snapshot(root, path):
     route = load_routes(root)[name]
     files = [path / "request.md", path / "01_review.md", root / "_shared/policy.json",
              root / "_shared/rules.md", root / "workflows/run.md", root / route["workspace"], root / route["workflow"]]
+    files += [root / "AGENTS.md", root / "CONTEXT.md", root / "scripts/wrapper-contract.json", root / "scripts/runs.py", root / "scripts/wrappers.py"]
+    files += [root / ref for ref in route["checks"]]
     # Each repo names additional stable inputs in the policy's review_inputs.
     policy = json.loads(regular(root / "_shared/policy.json").read_text())
     for ref in policy.get("review_inputs", []):

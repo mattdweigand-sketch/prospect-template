@@ -11,3 +11,4 @@ __pycache__/
 /_shared/taxonomy.json
 /_shared/claims.json
 .claude/settings.local.json
+/_shared/pairings.md

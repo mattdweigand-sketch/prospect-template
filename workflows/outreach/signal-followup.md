@@ -1,30 +1,29 @@
----
-type: workflow
-command: signal-followup
-mode: write
----
-# signal-followup
+# Follow-up task after a proven send
 
-Create one CRM follow-up task after a uniquely identified email was actually sent.
+Manual only. One uniquely proven sent email may produce one open CRM task.
 
 ## Load / Skip
-- Working: output/{run-id}/request.md and only its explicitly named inputs. On resumption, read that run's 01_review.md, review.json and 02_result.json.
-- Reference: _shared/policy.json (identity and the sections named below), _shared/rules.md, _shared/adapters.md; load _shared/icp.md, _shared/taxonomy.json and _shared/claims.json only where a step names them.
-- Lifecycle: [workflows/run.md](../run.md). Required adapter capabilities: crm, mail.
-- Skip: other runs, other workflow families, private example data, and unrelated factory sections. A missing adapter is a named limitation or blocks its dependent effect.
+
+- Working: output/{run-id}/request.md, a named sent email and the exact outreach/ARR handoff with signal and claim IDs.
+- Reference: workflows/run.md, _shared/rules.md; policy.json identity and followup_signal; taxonomy/claim IDs only for standard mode; adapters.md sent-mail proof, CRM resolution/task mappings, sync ownership.
+- Skip: drafting, new signal research, enrichment, warehouse data, knowledge sources and unrelated sends.
 
 ## Process
-1. Read sent mail in this run and identify exactly one message using the user-supplied thread, recipient, subject and date. A saved draft, local run record or remembered send is not proof. Resolve ambiguity before proposing anything.
-2. Resolve one Contact matching the recipient on the correct owned Account. Check Account routing and existing Tasks by message ID, matching subject and open follow-up prefix.
-3. If a duplicate or existing open follow-up exists, report it. Otherwise calculate the due date from the actual send date in policy.identity.timezone and the configured cadence. A date already in the past requires user direction.
-4. Propose the exact Task subject, date, status, priority, owner, Contact and Account links. Include the provider message/thread references and signal/claim IDs when known. Do not fabricate IDs for an unrelated manual email.
-5. After approval, refresh the duplicate check, create the one Task and read it back. Do not create a completed email activity if provider synchronization owns it. Do not draft or send a new email.
+
+1. Identify the requested recipient, subject or prior draft. Search **live sent mail** in this run for the recipient and match subject/date. Record message ID, thread ID, exact subject, timezone-aware sent timestamp and recipient with the provider lookup reference. A draft, queued send, summary or memory is not proof. Zero hits or multiple plausible hits stops; do not guess which was sent.
+2. Resolve one CRM account from the recipient domain, with owner and open opportunities; require the configured owner and no open deal. Read all contacts on that account with matching email and all tasks on the matching contact, every status. Record complete pagination/coverage. Exactly one matching contact belonging to the account is required; comparison is case-insensitive.
+3. Copy signal_type and claim_id from the reviewed outreach gate handoff. Standard mode requires known tier 1/2 and claim IDs. Use arr_growth mode only for a proven ARR-growth handoff, with both IDs set to arr_growth. Missing attribution requires user clarification, never invention.
+4. Build sent, sent_lookup_reference, account, contacts, contacts_complete, tasks, tasks_complete and signal in the packet. Run `python3 scripts/followup_gate.py --packet output/RUN_ID/followup.json` (or `--mode arr_growth`). The gate blocks duplicate subject/message ID and any open task with the configured follow-up prefix. Closed-status exceptions apply only to that prefix test, not an exact duplicate.
+5. Due date uses the sent date in identity.timezone plus followup_signal.due_calendar_days for standard mode, or growth_due_business_days weekdays for ARR mode. Weekdays exclude weekends, not local holidays. Naive timestamps and a due date before today block; a due date today is allowed. Do not shift an expired date to work around the gate.
+6. On allow, map the normalized task to the reviewed native provider fields **before** approval. Show subject, account/contact/owner IDs, status, priority, subtype, due date and description including message/thread/signal/claim IDs. Do not add an extra Type field or provider default without including it in the proposal. The configured mail sync owns completed Email activity; its absence is advisory and never permission to duplicate it.
+7. After exact review under workflows/run.md, repeat the sent proof and duplicate/ownership/open-deal reads. A changed message, field or preimage needs revised review. Create one open task with precisely the approved native fields. Read back the returned ID and compare all fields; report mismatches without repair or replay.
 
 ## Outputs and readiness
-- output/{run-id}/01_review.md contains the requested review and exact numbered effects, source coverage, evidence and unresolved items.
-- Ready when the scope is reconciled, findings have source references, required checks above pass, and gaps cannot be mistaken for checked evidence. Unsupported effects are withheld explicitly.
-- output/{run-id}/review.json records the user's review of this exact revision.
-- output/{run-id}/02_result.json follows the shared run contract. Every approved effect has an outcome and any provider/readback references.
+
+01_review.md shows sent proof, local sent time, CRM identity, contact/task coverage, any sync-task status, gate verdict/mode and the exact Effect. Declare the packet, proof references and gate result as artifacts. A block ends the run with reasons and no effect; it is not a prompt to try a looser match.
+
+02_result.json accounts for the one approved task and its provider/readback references. A second send requires a separate run.
 
 ## Human check
-Verify the unique sent-message evidence, matching Contact, no duplicate, and exact Task fields. Approve only that follow-up Task.
+
+Review send identity, duplicates, due date, attribution and exact native task fields. No completed Email tasks, contacts, events, opportunities, drafts or sends are created here. Approval of the earlier draft did not authorize this task.

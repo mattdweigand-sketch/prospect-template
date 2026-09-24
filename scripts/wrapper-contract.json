@@ -1,40 +1,76 @@
 {
-  "version": 1,
+  "version": 2,
   "commands": {
     "signal-scan": {
       "description": "Find and qualify public buying signals for one named account.",
       "workspace": "workflows/research/CONTEXT.md",
-      "workflow": "workflows/research/signal-scan.md"
+      "workflow": "workflows/research/signal-scan.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/evidence_gate.py",
+        "scripts/scan_verdict.py"
+      ]
     },
     "signal-user-scan": {
       "description": "Produce an organization-level adoption finding using a configured private-data adapter.",
       "workspace": "workflows/research/CONTEXT.md",
-      "workflow": "workflows/research/signal-user-scan.md"
+      "workflow": "workflows/research/signal-user-scan.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/privacy_check.py"
+      ]
     },
     "signal-prospector": {
       "description": "Discover candidate accounts, resolve CRM ownership, and propose exact account claims.",
       "workspace": "workflows/research/CONTEXT.md",
-      "workflow": "workflows/research/signal-prospector.md"
+      "workflow": "workflows/research/signal-prospector.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/evidence_gate.py",
+        "scripts/route_candidate.py"
+      ]
     },
     "signal-outreach": {
       "description": "Prepare one evidence-backed cold email and create an unsent draft after exact approval.",
       "workspace": "workflows/outreach/CONTEXT.md",
-      "workflow": "workflows/outreach/signal-outreach.md"
+      "workflow": "workflows/outreach/signal-outreach.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/outreach_gate.py",
+        "scripts/approval.py",
+        "scripts/lint_draft.py",
+        "scripts/privacy_check.py"
+      ]
     },
     "signal-followup": {
       "description": "Create one CRM follow-up task after a uniquely identified email was actually sent.",
       "workspace": "workflows/outreach/CONTEXT.md",
-      "workflow": "workflows/outreach/signal-followup.md"
+      "workflow": "workflows/outreach/signal-followup.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/followup_gate.py"
+      ]
     },
     "signal-arr-growth": {
       "description": "Find eligible self-service growth accounts through a configured billing adapter and propose template drafts.",
       "workspace": "workflows/outreach/CONTEXT.md",
-      "workflow": "workflows/outreach/signal-arr-growth.md"
+      "workflow": "workflows/outreach/signal-arr-growth.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/arr_growth_gate.py",
+        "scripts/route_candidate.py"
+      ]
     },
     "signal-refresh": {
       "description": "Propose claim-library updates from a configured, versioned knowledge source.",
       "workspace": "workflows/knowledge/CONTEXT.md",
-      "workflow": "workflows/knowledge/signal-refresh.md"
+      "workflow": "workflows/knowledge/signal-refresh.md",
+      "checks": [
+        "scripts/factory.py",
+        "scripts/refresh_tracks.py",
+        "scripts/approval.py",
+        "scripts/build_pairings.py"
+      ]
     }
   }
 }

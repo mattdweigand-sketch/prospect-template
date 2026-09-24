@@ -1,24 +1,41 @@
 # Local tooling
 
-Inputs: scripts/wrapper-contract.json, canonical workflow paths, and the explicitly selected local run.
-Process and ownership:
+Inputs: scripts/wrapper-contract.json, the selected workflow, explicitly named
+run inputs and its configured factory. No helper makes a network request.
+Python 3.9+ standard library only; factory configuration uses canonical JSON.
 
 | Tool | Job |
 |---|---|
-| wrappers.py | Generate/check root and family task maps, .agents skill pointers and .claude command pointers |
-| runs.py | Copy a run starter, record an existing review reference, inspect local run state |
-| check_signal.py | Check a fetched page quote, declared attribution, timezone timestamp and taxonomy freshness; semantic qualification stays human |
-| check_repo.py | Check links, contract shape, wrapper parity and public-template hygiene |
+| wrappers.py | Generate/check root/family routers and thin skill/command pointers |
+| runs.py | Copy a run starter, record an actual review reference, inspect review/result state |
+| evidence_gate.py | Match full-page quote, attribution and dated evidence; preserve actual fetch timestamp |
+| scan_verdict.py | Pick newest qualified Tier 1, else Tier 2, preserving report-order ties |
+| route_candidate.py | Distinct-type admission, territory/disqualifiers, ownership/open-deal routing |
+| privacy_check.py | Exact aggregate bundle fields/types, person-data leakage and category consistency |
+| outreach_gate.py | Claim/signal/persona approval, recipient, freshness, suppression and draft constraints |
+| lint_draft.py | Configured cold-email phrase, word-limit, punctuation and formatting checks |
+| followup_gate.py | Unique sent proof, contact, duplicate task and timezone-aware due date |
+| arr_growth_gate.py | Complete growth candidate packet, routing/suppression, fixed template and cap |
+| refresh_tracks.py | Pinned-commit evidence report and separate proposed factory postimages |
+| build_pairings.py | Rebuild ignored pairings.md; reject unknown/unreachable claim bindings |
+| approval.py | Detect changed approved content units; never grant authorization |
+| factory.py | Read canonical JSON files, ICP frontmatter and safe relative paths |
+| check_repo.py | Links, routes, public-template hygiene and example contract checks |
 
-Outputs: generated wrappers or output/{run-id}/ artifacts, according to the invoked command.
-Human check: review the diff; a passing static check does not approve external actions.
-Run `python3 scripts/check_repo.py` and `python3 -m unittest discover -s tests -v`.
-The tools use Python 3.9+ standard library and make no network requests.
+Outputs: JSON on stdout for gates; explicitly requested generated wrappers,
+run artifacts or staged factory postimages for the writing helpers. Packet
+shapes and CLI options live in each helper's docstring/--help; procedure and
+meaning live in the selected workflow. Gate exits: 0 pass, 1 held/blocked,
+2 unusable input, except routing returns 0 for any valid route (check claimable)
+and scan_verdict returns 0 for a valid no-signal finding (check recommended).
+Repository checks return nonzero on failure. A check is not approval.
 
-Signal bundle fields: account_name, account_domain, account_aliases (nonempty
-list), signal_type, source_url, quote, quote_speaker (account or third_party),
-evidence_subject, published_date (ISO date or null), event_date (ISO date or
-null), checked_at (ISO timestamp with offset). The declaring agent must check
-that aliases belong to the account. Source dates come from the fetched page.
-Run `python3 scripts/check_signal.py --bundle output/RUN_ID/bundle.json --page output/RUN_ID/source.txt`.
-The fetched source text and bundle belong in that review's artifacts list.
+Human check: inspect the diff, cited sources, exact effect and provider evidence.
+The run snapshot hashes selected helper dependencies from wrapper-contract.json
+as well as contracts/configuration. Editing a selected gate invalidates review.
+No helper chooses a customer run, sends mail, approves its own proposal or proves
+provider completion. Use explicit --shared temporary fixtures for synthetic work;
+there is no implicit fallback to examples in production helpers.
+
+Run `python3 -B scripts/check_repo.py` and
+`python3 -B -m unittest discover -s tests -v`.

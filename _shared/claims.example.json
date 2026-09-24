@@ -1,5 +1,5 @@
 {
-  "source_revision": "synthetic-v1",
+  "source_revision": null,
   "claims": [
     {
       "id": "csv_export",
@@ -19,7 +19,13 @@
         "name": null,
         "external_ok": false
       },
-      "approval_reference": null
+      "approval_reference": null,
+      "track": "Example Product exports reports as CSV.",
+      "approved": null
     }
-  ]
+  ],
+  "source_root": "",
+  "source_date": null,
+  "evidence_verified": null,
+  "held": []
 }

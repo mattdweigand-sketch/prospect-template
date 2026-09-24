@@ -11,15 +11,23 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def load_routes(root=ROOT):
     doc = json.loads((root / "scripts/wrapper-contract.json").read_text())
-    if doc.get("version") != 1 or not isinstance(doc.get("commands"), dict):
+    if doc.get("version") != 2 or not isinstance(doc.get("commands"), dict):
         raise ValueError("invalid wrapper contract")
     for name, row in doc["commands"].items():
         if not re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*", name):
             raise ValueError("invalid command name: " + name)
-        if set(row) != {"description", "workspace", "workflow"}:
+        if set(row) != {"description", "workspace", "workflow", "checks"}:
             raise ValueError("invalid route fields: " + name)
         if not isinstance(row["description"], str) or not row["description"].strip():
             raise ValueError("missing description: " + name)
+        if not isinstance(row["checks"], list) or not row["checks"] or len(row["checks"]) != len(set(row["checks"])):
+            raise ValueError("checks must name distinct helper files: " + name)
+        for ref in row["checks"]:
+            target = Path(ref)
+            if target.is_absolute() or ".." in target.parts or target.parent != Path("scripts") or target.suffix != ".py":
+                raise ValueError("check must be a Python file directly inside scripts/")
+            if not (root / target).is_file() or (root / target).is_symlink():
+                raise ValueError("missing or symlinked check: " + ref)
         for key in ("workspace", "workflow"):
             target = Path(row[key])
             if target.is_absolute() or ".." in target.parts or not str(target).startswith("workflows/"):

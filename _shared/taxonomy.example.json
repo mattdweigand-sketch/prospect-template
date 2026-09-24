@@ -13,7 +13,24 @@
       ],
       "example_queries": [
         "company reporting initiative"
-      ]
+      ],
+      "source": "web",
+      "definition": "An account announces a reporting project.",
+      "approved": null
+    },
+    {
+      "id": "paid_individuals_present",
+      "tier": 2,
+      "source": "adoption",
+      "freshness_days": 2,
+      "definition": "Aggregate paid-individual adoption with no organization subscription.",
+      "creates_work": "Evaluate whether an organization agreement fits.",
+      "target_titles": [
+        "Operations"
+      ],
+      "claim_ids": [],
+      "example_queries": [],
+      "approved": null
     }
   ]
 }
