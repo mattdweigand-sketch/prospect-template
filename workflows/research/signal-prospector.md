@@ -25,7 +25,23 @@ Discover candidate accounts, verify their evidence and territory, and propose ex
 
 The review has run/date, search coverage, all candidate routes with supporting quotes/dates/links, headcount source, blockers and exact numbered `Effect` proposals. Declare page/receipt/bundle/routing outputs and permissible CRM read receipts as artifacts. Missing sources keep the affected effect in draft; no claimable candidates is a finding, not proof the territory is empty.
 
-In inputs.json, retain `sources` entries `{receipt, page, result, checked_at}` and `candidates` entries `{receipt, result, sources}`. A candidate's sources names its source-result paths; its routing receipt includes the existing account_id when linking adoption evidence. Optional `contact` names a file containing first_name, last_name, title, verified email and source_reference; optional `adoption` is the exact reviewed aggregate handoff defined in workflows/run.md. Public signal associations precede the adoption signal in the routing receipt. Bind each Effect to its candidate receipt with kind account_create, owner_transfer or contact_create; a new-account contact also names its account_effect. Preflight rechecks source/account/type associations and eligibility. Held candidates remain findings and cannot supply effect bindings.
+In inputs.json, retain `sources` entries `{receipt, page, result, checked_at}` and `candidates` entries `{receipt, result, sources}`. A candidate's sources names its source-result paths; its routing receipt includes the existing account_id for owner transfers and adoption evidence. Optional `adoption` is the exact reviewed aggregate handoff defined in workflows/run.md. Public signal associations precede the adoption signal in the routing receipt. Bind each Effect to its candidate receipt with kind account_create, owner_transfer or contact_create. Preflight rechecks source/account/type associations and eligibility. Held candidates remain findings and cannot supply effect bindings.
+
+A candidate's optional `contact` names a file requiring `first_name`, `last_name`, `title`, verified `email`, `source` and `source_reference`. `source` must exactly match a value in `policy.prospector.contact_email_sources`; `source_reference` identifies the supporting verification receipt. For a new account, omit `account_id` or set it to null, and set `account_effect` on the contact's effect binding in inputs.json to the approved account-creation effect ID. For an existing account, the contact's `account_id` must match the candidate routing receipt's `account_id`.
+
+Example contact.json for a new account (fictional data; the source must be permitted by the deployment policy):
+
+```json
+{
+  "first_name": "Alex",
+  "last_name": "Example",
+  "title": "Operations Director",
+  "email": "alex@example.org",
+  "source": "verified enrichment",
+  "source_reference": "synthetic-contact-verification",
+  "account_id": null
+}
+```
 
 After application, 02_result.json accounts for each approved effect and readback. Hand off verified claims and their qualified bundles by exact run/reference to outreach on request. CRM remains the account/contact record; the local review is not a prospect ledger.
 
