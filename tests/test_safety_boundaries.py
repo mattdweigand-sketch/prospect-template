@@ -93,7 +93,7 @@ class SafetyBoundaries(unittest.TestCase):
             (d / "receipt.json").write_text(json.dumps(evidence.receipt()))
             (d / "page.txt").write_text(evidence.PAGE)
             cmd = [sys.executable, "-B", str(SCRIPTS / "evidence_gate.py"), "--receipt", str(d / "receipt.json"),
-                   "--page", str(d / "page.txt"), "--policy", str(SHARED / "policy.json"), "--today", "2026-09-21"]
+                   "--page", str(d / "page.txt"), "--policy", str(SHARED / "policy.json"), "--now", "2026-09-21T12:00:00-07:00"]
             missing = subprocess.run(cmd, capture_output=True, text=True)
             self.assertEqual(missing.returncode, 2)
             fetched = "2026-09-20T01:02:03+00:00"
@@ -204,10 +204,10 @@ class SafetyBoundaries(unittest.TestCase):
         for key in ("tasks_complete", "contacts_complete", "sent_lookup_reference"):
             packet = copy.deepcopy(followup.BASE)
             packet.pop(key)
-            self.assertEqual(followup_gate.check(packet, "standard", followup.POLICY, followup.TODAY, SHARED)["verdict"], "block")
+            self.assertEqual(followup_gate.check(packet, "standard", followup.POLICY, followup.NOW, SHARED)["verdict"], "block")
         packet = copy.deepcopy(followup.BASE)
         packet["contacts"][0]["account_id"] = "different-account"
-        self.assertEqual(followup_gate.check(packet, "standard", followup.POLICY, followup.TODAY, SHARED)["verdict"], "block")
+        self.assertEqual(followup_gate.check(packet, "standard", followup.POLICY, followup.NOW, SHARED)["verdict"], "block")
 
     def test_followup_future_send_and_invalid_cadence_block(self):
         self.assertEqual(followup.run(sent=[{**followup.BASE["sent"][0], "sent_at": "2027-01-01T01:00:00Z"}])["verdict"], "block")

@@ -98,6 +98,24 @@ class OutreachGateTests(unittest.TestCase):
     def test_clean_packet_allows(self):
         self.assertEqual(self.check(PACKET), [])
 
+    def test_private_signal_cannot_replace_public_outreach_evidence(self):
+        packet = pk(bundle__signal_type="paid_individuals_present", bundle__published_date=NOW.date().isoformat())
+        self.assertBlocks(packet, "bundle signal_type must use a web source")
+
+    def test_unconfigured_source_blocks_even_with_current_signal_stamp(self):
+        for source in (None, "", "warehouse"):
+            d = shared_copy(lambda d: None)
+            try:
+                tax = factory.read(d / "taxonomy.json")
+                signal = next(s for s in tax["signals"] if s["id"] == "ai_exec_appointment")
+                signal["source"] = source
+                signal["approved"] = approval.make_stamp(signal, "2026-09-22")
+                factory.write(d / "taxonomy.json", tax)
+                with self.subTest(source=source):
+                    self.assertEqual(self.check(PACKET, shared=d), ["bundle signal_type must use a web source"])
+            finally:
+                shutil.rmtree(d)
+
     # freshness
     def test_published_date_freshness_is_per_signal_type(self):
         self.assertEqual(self.check(pk(bundle__published_date="2026-06-24")), [])  # 90 days, ai_exec_appointment allows 90

@@ -19,13 +19,14 @@ receipt.json
 
 Checks. Required keys present. source_url is http(s). quote has at least policy scan.quote_min_words words
 and appears verbatim in the page text (whitespace and curly quotes normalized). evidence_subject is
-account_name or a declared alias. signal_type is a tier1 or tier2 id in the taxonomy. The governing date is
-not in the future and within that signal type's freshness_days. Qualified bundles carry "warnings":
+account_name or a declared alias. signal_type is a tier1 or tier2 web-source id in the taxonomy. The governing
+date is not in the future and within freshness_days, using identity.timezone. Qualified bundles carry "warnings":
 ["third_party_paraphrase"] whenever quote_speaker is third_party, for any signal type.
 
 Qualified bundles carry checked_on (validation date) and checked_at (actual source fetch timestamp with offset).
 The CLI requires the fetch time explicitly or in receipt.checked_at; rechecking a saved file never refreshes it.
 outreach_gate.py measures bundle age from checked_at.
+For a deterministic replay, --now must be a full timezone-aware timestamp.
 
 Exit 0 qualified, bundle JSON on stdout. Exit 1 no_usable_signal (never proof of absence).
 Exit 2 unusable input. Always JSON on stdout, never a traceback.
@@ -37,6 +38,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
 
 import factory
 
@@ -69,13 +71,15 @@ def norm_name(name):
 
 
 def load_taxonomy(policy_path):
+    """Load qualification rules, owner timezone and each signal's source boundary."""
     policy = json.loads(Path(policy_path).read_text())
     taxonomy = factory.taxonomy(Path(policy_path).parent)
     types = {}
     for tier, entries in taxonomy["tiers"].items():
         for entry in entries:
-            types[entry["id"]] = {"tier": tier, "freshness_days": entry.get("freshness_days")}
-    return policy["scan"], types
+            types[entry["id"]] = {"tier": tier, "freshness_days": entry.get("freshness_days"),
+                                  "source": entry.get("source")}
+    return {**policy["scan"], "timezone": policy["identity"]["timezone"]}, types
 
 
 def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
@@ -112,6 +116,8 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
         return 2, {"outcome": "unusable", "reason": "signal_type_not_in_taxonomy"}
     if signal["tier"] not in ("tier1", "tier2"):
         return 1, {"outcome": "no_usable_signal", "reason": "tier3_never_qualifies"}
+    if signal.get("source") != "web":
+        return 1, {"outcome": "no_usable_signal", "reason": "signal_source_not_web"}
 
     if receipt["published_date"] is None:
         if receipt["quote_speaker"] != "account":
@@ -158,22 +164,23 @@ def main():
     ap.add_argument("--receipt", required=True)
     ap.add_argument("--page", required=True)
     ap.add_argument("--policy", default=str(Path(__file__).resolve().parent.parent / "_shared" / "policy.json"))
-    ap.add_argument("--today", default=None)
+    ap.add_argument("--now", help="Timezone-aware timestamp for deterministic replay; defaults to the current time")
     ap.add_argument("--checked-at", help="Actual timezone-aware page fetch time; otherwise receipt.checked_at is required")
     args = ap.parse_args()
     try:
         receipt = json.loads(Path(args.receipt).read_text())
         page_text = Path(args.page).read_text(errors="replace")
         scan_policy, types = load_taxonomy(args.policy)
-        now = datetime.now().astimezone()
-        if args.today:
-            now = datetime.combine(date.fromisoformat(args.today), datetime.min.time().replace(hour=12)).astimezone()
-        today = now.date()
+        zone = ZoneInfo(scan_policy["timezone"])
+        now = datetime.fromisoformat(args.now.replace("Z", "+00:00")) if args.now else datetime.now(zone)
+        if now.tzinfo is None:
+            raise ValueError("now must be a timezone-aware timestamp")
+        today = now.astimezone(zone).date()
         raw_checked = args.checked_at or receipt.get("checked_at")
         if not isinstance(raw_checked, str):
             raise ValueError("record the actual source fetch time with --checked-at or receipt.checked_at")
         checked = datetime.fromisoformat(raw_checked.replace("Z", "+00:00"))
-        if checked.tzinfo is None or (not args.today and checked > now):
+        if checked.tzinfo is None or checked > now:
             raise ValueError("checked_at must be timezone-aware and not in the future")
     except Exception as exc:  # bad input, never a traceback
         print(json.dumps({"outcome": "unusable", "reason": "input_error", "detail": str(exc)}))

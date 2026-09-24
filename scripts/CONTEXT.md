@@ -29,6 +29,8 @@ meaning live in the selected workflow. Gate exits: 0 pass, 1 held/blocked,
 2 unusable input, except routing returns 0 for any valid route (check claimable)
 and scan_verdict returns 0 for a valid no-signal finding (check recommended).
 Repository checks return nonzero on failure. A check is not approval.
+Evidence and follow-up replay use --now with a full timezone-aware timestamp;
+normal runs use the current time and configured identity.timezone.
 
 Human check: inspect the diff, cited sources, exact effect and provider evidence.
 The run snapshot hashes selected helper dependencies from wrapper-contract.json

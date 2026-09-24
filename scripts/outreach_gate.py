@@ -3,7 +3,7 @@
 
 Usage: python3 scripts/outreach_gate.py --packet packet.json [--shared DIR] [--now AWARE_TIMESTAMP]
 Packet keys:
-  bundle: qualified evidence_gate bundle, plus optional vertical.
+  bundle: qualified evidence_gate bundle for a web-source signal, plus optional vertical.
   claim: {id, evidence, persona, pick_reason}; evidence is the selected row's exact
     evidence. pick_reason is one sentence tying the signal quote to that claim.
   recipient: {email, name, source, title, title_override}; override is a real
@@ -122,6 +122,8 @@ def check(p, pol, shared, now):
     if stype is None:
         reasons.append(f"bundle signal_type not a tier1 or tier2 id: {b['signal_type']}")
     else:
+        if stype.get("source") != "web":
+            reasons.append("bundle signal_type must use a web source")
         age = (today - d(b["published_date"])).days
         if age < 0:
             reasons.append("bundle published_date is in the future")

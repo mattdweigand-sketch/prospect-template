@@ -8,13 +8,15 @@ Packet:
   account: {id, owner_id, open_opportunity_ids: []}.
   contacts: exactly one {id, account_id, email} matching the account and send.
   contacts_complete: true; tasks_complete: true, backed by complete read receipts.
-  tasks: all contact tasks [{id, subject, description, status}], any status.
+  tasks: required list of all contact tasks [{id, subject, description, status}], any status.
+    An empty list means a completed lookup found none; missing/null blocks.
   signal: {signal_type, claim_id} from the reviewed handoff; both arr_growth for
     arr_growth mode. Missing attribution is not guessed.
 
 Checks proof uniqueness, owner/open deal, contact association, duplicate subject,
 message ID and open follow-up prefix; calculates the configured calendar/weekday
-cadence in the owner's timezone. Due dates before today and future sends block.
+cadence in the owner's timezone. Due dates before today and future sends block,
+including a timestamp later today. --now accepts an aware timestamp for replay.
 Normalized task fields must be mapped to exact provider fields before review.
 No completed-email logging, provider calls or writes. Exit 0 allow, 1 block,
 2 unusable input. Full lifecycle: workflows/outreach/signal-followup.md.
@@ -22,7 +24,7 @@ No completed-email logging, provider calls or writes. Exit 0 allow, 1 block,
 import argparse
 import json
 import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -53,12 +55,19 @@ def due_date(sent_at, mode, policy):
     return day
 
 
-def check(packet, mode, policy, today=None, shared=SHARED):
-    today = today or datetime.now(ZoneInfo(policy["identity"]["timezone"])).date()
+def check(packet, mode, policy, now=None, shared=SHARED):
+    zone = ZoneInfo(policy["identity"]["timezone"])
+    now = now or datetime.now(zone)
+    if now.tzinfo is None:
+        raise ValueError("now must be a timezone-aware timestamp")
+    today = now.astimezone(zone).date()
     fp = policy["followup_signal"]
     reasons = []
     if packet.get("tasks_complete") is not True or packet.get("contacts_complete") is not True or not packet.get("sent_lookup_reference"):
         reasons.append("complete contact/task reads and live sent-mail reference are required")
+    tasks = packet.get("tasks")
+    if not isinstance(tasks, list) or any(not isinstance(task, dict) for task in tasks):
+        return {"verdict": "block", "reasons": reasons + ["tasks must be an explicit list of task objects"]}
     sent = packet.get("sent") or []
     if len(sent) == 0:
         return {"verdict": "block", "reasons": ["no sent proof"]}
@@ -96,7 +105,7 @@ def check(packet, mode, policy, today=None, shared=SHARED):
 
     subject = fp["task"]["subject"].format(mail_subject=s["subject"])
     prefix = fp["task"]["subject"].split("{")[0].strip()
-    for t in packet.get("tasks") or []:
+    for t in tasks:
         subj = t.get("subject") or ""
         is_open = (t.get("status") or "") not in fp["closed_statuses"]
         if subj == subject or s["message_id"] in (t.get("description") or ""):
@@ -111,7 +120,7 @@ def check(packet, mode, policy, today=None, shared=SHARED):
 
     try:
         due = due_date(s["sent_at"], mode, policy)
-        if datetime.fromisoformat(s["sent_at"].replace("Z", "+00:00")).astimezone(ZoneInfo(policy["identity"]["timezone"])).date() > today:
+        if datetime.fromisoformat(s["sent_at"].replace("Z", "+00:00")) > now:
             raise ValueError("sent_at is in the future")
     except ValueError as e:
         return {"verdict": "block", "reasons": [str(e)]}
@@ -137,13 +146,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--packet", required=True)
     ap.add_argument("--mode", choices=("standard", "arr_growth"), default="standard")
-    ap.add_argument("--today", help="YYYY-MM-DD, tests only")
+    ap.add_argument("--now", help="Timezone-aware timestamp for deterministic replay; defaults to the current time")
     ap.add_argument("--shared", type=Path, default=SHARED)
     a = ap.parse_args()
     try:
         packet = json.loads(Path(a.packet).read_text())
         policy = load_policy(a.shared)
-        out = check(packet, a.mode, policy, date.fromisoformat(a.today) if a.today else None, a.shared)
+        now = datetime.fromisoformat(a.now.replace("Z", "+00:00")) if a.now else None
+        out = check(packet, a.mode, policy, now, a.shared)
     except Exception as e:
         print(json.dumps({"verdict": "error", "reasons": [str(e)]}))
         return 2

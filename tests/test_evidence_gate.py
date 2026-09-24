@@ -1,5 +1,7 @@
 """Synthetic regression tests; no live services."""
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,6 +71,56 @@ class EvidenceGate(unittest.TestCase):
         code, out = self.run_gate(receipt(signal_type="generic_ai_marketing"))
         self.assertEqual((code, out["reason"]), (1, "tier3_never_qualifies"))
 
+    def test_private_or_unconfigured_signal_source_cannot_qualify(self):
+        code, out = self.run_gate(receipt(signal_type="paid_individuals_present"))
+        self.assertEqual((code, out["reason"]), (1, "signal_source_not_web"))
+        for source in (None, "", "warehouse"):
+            with self.subTest(source=source):
+                self.types["ai_exec_appointment"]["source"] = source
+                code, out = self.run_gate(receipt())
+                self.assertEqual((code, out["reason"]), (1, "signal_source_not_web"))
+
+    def test_cli_dates_use_owner_timezone_independently_of_host(self):
+        now = datetime.fromisoformat("2026-09-21T23:30:00-07:00")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copyfile(SHARED / "taxonomy.json", root / "taxonomy.json")
+            (root / "page.txt").write_text(PAGE)
+            for zone, owner_day in (("UTC", date(2026, 9, 22)), ("America/Los_Angeles", date(2026, 9, 21))):
+                policy = json.loads(POLICY.read_text())
+                policy["identity"]["timezone"] = zone
+                (root / "policy.json").write_text(json.dumps(policy))
+                for host in ("UTC", "Pacific/Honolulu"):
+                    for age, expected in ((0, 0), (90, 0), (91, 1), (-1, 2)):
+                        with self.subTest(zone=zone, host=host, age=age):
+                            (root / "receipt.json").write_text(json.dumps(receipt(published_date=(owner_day - timedelta(days=age)).isoformat())))
+                            result = subprocess.run([
+                                sys.executable, "-B", str(SCRIPTS / "evidence_gate.py"),
+                                "--receipt", str(root / "receipt.json"), "--page", str(root / "page.txt"),
+                                "--policy", str(root / "policy.json"), "--now", now.isoformat(),
+                                "--checked-at", (now - timedelta(minutes=1)).isoformat(),
+                            ], env={**os.environ, "TZ": host}, capture_output=True, text=True)
+                            self.assertEqual(result.returncode, expected, result.stdout)
+                            output = json.loads(result.stdout)
+                            if expected == 0:
+                                self.assertEqual(output["bundle"]["checked_on"], owner_day.isoformat())
+                            else:
+                                self.assertEqual(output["reason"], "stale" if age == 91 else "published_date_in_future")
+
+    def test_cli_replay_rejects_future_fetch_and_naive_clock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "receipt.json").write_text(json.dumps(receipt()))
+            (root / "page.txt").write_text(PAGE)
+            cmd = [sys.executable, "-B", str(SCRIPTS / "evidence_gate.py"),
+                   "--receipt", str(root / "receipt.json"), "--page", str(root / "page.txt"),
+                   "--policy", str(POLICY), "--checked-at", "2026-09-21T16:00:01-07:00"]
+            for clock in ("2026-09-21T16:00:00-07:00", "2026-09-21T16:00:00", "2026-09-21"):
+                with self.subTest(clock=clock):
+                    result = subprocess.run(cmd + ["--now", clock], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 2, result.stdout)
+                    self.assertEqual(json.loads(result.stdout)["reason"], "input_error")
+
     def test_undated_page_without_event_date_fails(self):
         code, out = self.run_gate(receipt(published_date=None))
         self.assertEqual((code, out["reason"]), (1, "undated_page_without_event_date"))
@@ -101,7 +153,7 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual(out["bundle"]["warnings"], ["third_party_paraphrase"])
 
     def test_third_party_custom_signal_warns(self):
-        self.types["reporting_initiative"] = {"tier": "tier1", "freshness_days": 90}
+        self.types["reporting_initiative"] = {"tier": "tier1", "freshness_days": 90, "source": "web"}
         code, out = self.run_gate(receipt(signal_type="reporting_initiative", quote_speaker="third_party"))
         self.assertEqual(code, 0)
         self.assertEqual(out["bundle"]["warnings"], ["third_party_paraphrase"])
