@@ -113,9 +113,11 @@ class SkillProcedureTests(unittest.TestCase):
             contract = procedure.with_name("CONTEXT.md")
             self.assertTrue(contract.is_file(), str(contract))
             text = contract.read_text()
-            for heading in ("## Inputs", "## Process", "## Output", "## Human check", "## Next"):
+            for heading in ("## Inputs", "## Process", "## Checkpoints", "## Audit", "## Outputs", "## Next"):
                 self.assertIn(heading, text, str(contract))
-            for target in re.findall(r"`([^`]+)`", text):
+            inputs = text.split('## Inputs\n', 1)[1].split('\n## ', 1)[0]
+            handoffs = text.split('## Next\n', 1)[1]
+            for target in re.findall(r"`([^`]+)`", inputs + handoffs):
                 if target.startswith("../") or target.endswith((".md", ".py", ".sql", ".yaml")):
                     resolved = (contract.parent / target).resolve()
                     self.assertIn(ROOT, resolved.parents, f"contract escapes repo: {target}")

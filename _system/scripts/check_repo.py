@@ -37,6 +37,70 @@ def procedure_files(root):
                   for p in (Path(root)/area).rglob('procedure.md'))
 
 
+def section(text, heading):
+    match = re.search(r'^## '+re.escape(heading)+r'\s*\n(.*?)(?=^## |\Z)', text, re.M | re.S)
+    return match.group(1) if match else ''
+
+
+def table_rows(text):
+    return [[cell.strip() for cell in line.strip().strip('|').split('|')]
+            for line in text.splitlines() if line.startswith('|')
+            and not re.fullmatch(r'[|:\s-]+', line)]
+
+
+def contract_issues(root, procedure):
+    root = Path(root).resolve(); contract = procedure.with_name('CONTEXT.md')
+    label = str(contract.relative_to(root)); errors = []
+    if not contract.is_file(): return ['missing workflow contract: '+label]
+    text = contract.read_text(); detail = procedure.read_text()
+    if len(text.splitlines()) > 80: errors.append('contract exceeds 80 lines: '+label)
+    headers = {'Inputs': ['Source','File/Location','Section/Scope','Why'],
+               'Checkpoints': ['After Step','Agent Presents','Human Decides'],
+               'Audit': ['Check','Pass Condition'], 'Outputs': ['Artifact','Location','Format']}
+    tables = {}
+    for heading, header in headers.items():
+        rows = table_rows(section(text, heading)); tables[heading] = rows[1:]
+        if not rows or rows[0] != header or len(rows) < 2 or any(len(row) != len(header) or not all(row) for row in rows):
+            errors.append('invalid '+heading+' table: '+label)
+    numbers = lambda body: re.findall(r'^(\d+)\. ', body, re.M)
+    steps = numbers(section(text, 'Process')); detailed = numbers(section(detail, 'Steps'))
+    if not steps or steps != [str(i) for i in range(1, len(steps)+1)] or steps != detailed:
+        errors.append('process steps do not match procedure: '+label)
+    for row in tables['Checkpoints']:
+        if row[0] not in steps: errors.append('checkpoint references missing step: '+label)
+    if 'Audit' not in detail: errors.append('procedure does not invoke contract Audit: '+label)
+    targets = []
+    for row in tables['Inputs']:
+        if len(row) != 4: continue
+        paths = re.findall(r'`([^`]+)`', row[1]); targets.extend(paths)
+        if row[0] != 'Working' and not paths: errors.append('input needs an explicit file: '+label)
+    if 'procedure.md' not in targets: errors.append('procedure missing from Inputs: '+label)
+    targets.extend(re.findall(r'`([^`]+)`', section(text, 'Next')))
+    for target in targets:
+        resolved = (contract.parent/target).resolve()
+        if root not in resolved.parents:
+            errors.append('escaping contract path: '+label+': '+target); continue
+        # Installed settings do not exist in a fresh template; check their schema owners.
+        if resolved.is_relative_to(root/'.local/config'):
+            resolved = root/'setup/templates'/resolved.relative_to(root/'.local/config')
+        if not resolved.exists(): errors.append('broken contract path: '+label+': '+target)
+    return errors
+
+
+def markdown_issues(path, text):
+    errors = []; fence = None
+    for line in text.splitlines():
+        match = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if not match: continue
+        marker, rest = match.groups()
+        if fence is None: fence = marker
+        elif marker[0] == fence[0] and len(marker) >= len(fence) and not rest.strip(): fence = None
+    if fence: errors.append('unclosed Markdown fence: '+str(path))
+    if (path.name == 'procedure.md' or 'references' in path.parts) and len(text.splitlines()) > 200:
+        errors.append('procedure/reference exceeds 200 lines: '+str(path))
+    return errors
+
+
 def layout_issues(root):
     root = Path(root)
     allowed = {'AGENTS.md','CONTEXT.md','README.md','LICENSE','.gitignore',
@@ -47,18 +111,27 @@ def layout_issues(root):
         base = root/area
         folders = [base] + [p for p in base.rglob('*') if p.is_dir() and not any(part in ('__pycache__','.pytest_cache') for part in p.parts)]
         for folder in folders:
+            # A working contract owns its optional references and output folders.
+            if any(parent.name in ('references','output') and (parent.parent/'procedure.md').is_file()
+                   for parent in (folder, *folder.parents)):
+                continue
             if not (folder/'CONTEXT.md').is_file():
                 errors.append('folder needs a purpose contract: '+str(folder.relative_to(root)))
     for folder in list((root/'stages').glob('*')) + list((root/'workflows').glob('*')):
         if folder.is_dir():
-            extras = {p.name for p in folder.iterdir()} - {'CONTEXT.md','procedure.md'}
+            extras = {p.name for p in folder.iterdir()} - {'CONTEXT.md','procedure.md','references','output'}
             if extras: errors.append('implementation or stray files in working folder: '+str(folder.relative_to(root)))
+    for procedure in procedure_files(root):
+        output = procedure.parent/'output'
+        if output.exists() and (not output.is_dir() or any(p.name != '.gitkeep' or not p.is_file() or p.stat().st_size for p in output.iterdir())):
+            errors.append('operational output belongs outside the checkout: '+str(output.relative_to(root)))
     return errors
 
 
 def check(root=ROOT):
-    root=Path(root); errors=layout_issues(root); workflows=set(); procedures={}
+    root=Path(root).resolve(); errors=layout_issues(root); workflows=set(); procedures={}
     for procedure in procedure_files(root):
+        errors.extend(contract_issues(root, procedure))
         try:
             name=yaml.safe_load(procedure.read_text().split('---\n',2)[1])['workflow']
             if not isinstance(name,str) or not name.strip(): raise ValueError('workflow name required')
@@ -92,6 +165,7 @@ def check(root=ROOT):
             except SyntaxError as exc: errors.append(str(exc))
         if path.suffix in ('.md','.py','.sql','.yaml'):
             errors.extend(neutrality_issues(path.relative_to(root),path.read_text()))
+        if path.suffix == '.md': errors.extend(markdown_issues(path.relative_to(root),path.read_text()))
     policy=yaml.safe_load((root/'setup/templates/policy.yaml').read_text())
     if policy['deployment']['mode']!='example': errors.append('starter configuration must stay fictional')
     if any((policy['warehouse']['enabled'],policy['user_scan']['enabled'],policy['arr_growth']['enabled'],policy['prospector']['adoption_source']['enabled'])):

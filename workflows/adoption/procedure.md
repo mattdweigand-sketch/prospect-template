@@ -9,7 +9,7 @@ next: signal-outreach with the privacy-checked bundle, on request
 
 Read-only. Answers one question about one account, whether the configured product is already in use there at the level a salesperson may repeat. Never reports who, how many, or when.
 
-Read this workflow's `CONTEXT.md` before the steps. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
+Read this workflow's `CONTEXT.md` and its scoped inputs before the steps. Run its Audit before presenting the report or proposal, and its completion checks after any approved write. Honor its conditional checkpoints. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
 
 ## Before starting
 
@@ -28,7 +28,7 @@ Read `shared/providers.md` for tool discovery, complete reads, pre-write revalid
 
 ## Report
 
-```
+````text
 Account: <name> | CRM: <Id> | Owner: <name, active/inactive> | Route: scan / active_deal / owned_elsewhere
 Domain: <domain> | Data through: <date>
 Adoption: org_adopted / individuals_only / none_found
@@ -40,7 +40,7 @@ Privacy check: clean
 ```
 none_found: no mapped org and no paid individuals on the data date. Not proof of absence. The org may be mapped to a duplicate Account.
 Next: individuals_only may go to signal-outreach; org_adopted needs a qualified web signal; none_found adds no claim.
-```
+````
 
 ## Refuse
 

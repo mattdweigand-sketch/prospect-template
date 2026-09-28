@@ -9,7 +9,7 @@ next: signal-outreach with the qualified bundle, on request
 
 Read-only. Finds public evidence that a named account has a current initiative relevant to the configured offer, proves each quote against the fetched page, and returns a bundle `signal-outreach` can draft from. Writes nothing anywhere.
 
-Read this workflow's `CONTEXT.md` before the steps. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
+Read this workflow's `CONTEXT.md` and its scoped inputs before the steps. Run its Audit before presenting the report or proposal, and its completion checks after any approved write. Honor its conditional checkpoints. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
 
 ## Before starting
 
@@ -60,7 +60,7 @@ For a named-account list in one request. Same steps, rules, and gate as above, g
 2. CRM in three reads for the whole list. Accounts by every name and every Website domain, deals with account_id in the matched ids where `policy.crm.open_deal` holds, and Tasks with account_id in the matched ids inside `policy.outreach.activity_lookback_days`. Split the rows by account and apply step 2 to each. An account routed `active_deal` or `warm_engaged` stops there. The rest continue.
 3. Declare aliases per account (step 3).
 4. Send every continuing account's step 4 queries together, using the configured `web.search` tool and its actual batch limit, each hit tagged with its account. Pick per account under the step 4 limit, then fetch the selected full sources with `web.fetch`. Tool names and batch limits come from current discovery, not this procedure.
-5. Gate per source as in steps 5 to 7. One receipt and one `evidence_gate.py` run per source, one `../../_system/scripts/scan_verdict.py` run per account with only that account's outputs. Never pool outputs across accounts.
+5. Gate per source as in steps 5 to 7. One receipt and one `evidence_gate.py` run per source, one `_system/scripts/scan_verdict.py` run per account with only that account's outputs. Never pool outputs across accounts.
 6. Report one table, then the single-account Report block only for accounts with a gate-qualified item, fit-rejected included, each with its gate bundle. Every other account gets its table row only.
 
 ```

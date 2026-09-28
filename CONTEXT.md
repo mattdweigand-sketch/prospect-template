@@ -1,6 +1,6 @@
 # Prospect handoffs and state
 
-This is one prospecting workspace: setup and refresh configure it, four numbered stages describe the main progression, and two optional workflows handle subscription data. The eight skills remain independently callable. `AGENTS.md` is the routing owner. Each workflow contract names its inputs, process, output and human check; its procedure supplies the steps.
+This is one prospecting workspace: setup and refresh configure it, four numbered stages describe the main progression, and two optional workflows handle subscription data. The eight skills remain independently callable. `AGENTS.md` is the routing owner. Each workflow contract names scoped inputs, numbered process, checkpoints, Audit and output formats/locations. Its process numbers match the detailed procedure. Run the Audit before presenting a report or proposal; completion checks run after approved writes. Checkpoints describe existing conditional stops, not new approvals for ordinary reads.
 
 | Producer | Consumer and boundary |
 |---|---|
@@ -11,6 +11,12 @@ This is one prospecting workspace: setup and refresh configure it, four numbered
 | `signal-user-scan` | Privacy-checked account context to outreach as its procedure permits. |
 | `signal-outreach` / `signal-arr-growth` | Reviewed email draft. The user sends manually; only a native sent message can enter `signal-followup`. |
 | `signal-followup` | One reviewed, read-back CRM Task. |
+
+## Layout adaptations
+
+This template adapts the [ICM stage contract](https://github.com/RinDig/Interpretable-Context-Methodology/blob/main/_core/templates/stage-context-template.md) to a Codex workspace. `AGENTS.md` is the bootstrap; each short `CONTEXT.md` uses one adjacent `procedure.md` for detailed steps and report examples. Optional `references/` folders can hold supporting documents. An empty `output/.gitkeep` placeholder is allowed, but operational files use the locations below. Implementation stays in `_system/`. Contracts stay within 80 lines and procedure/reference documents within 200.
+
+The output location is an explicit host adaptation: operational artifacts stay in chat and native providers, while setup uses ignored local files. There is no repository output ledger or reconstructed approval state.
 
 ## State and output locations
 

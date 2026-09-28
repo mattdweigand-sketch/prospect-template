@@ -9,7 +9,7 @@ next: signal-followup, mode arr_growth, after the seller sends
 
 Growing self-serve spend is the signal. The billing contact is the recipient. The email is a fixed template that names no figures. Manual only (`policy.approval.unattended_writes`). Each draft is its own approval.
 
-Read this workflow's `CONTEXT.md` before the steps. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
+Read this workflow's `CONTEXT.md` and its scoped inputs before the steps. Run its Audit before presenting the report or proposal, and its completion checks after any approved write. Honor its conditional checkpoints. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
 
 ## Before starting
 

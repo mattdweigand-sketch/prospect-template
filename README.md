@@ -67,7 +67,9 @@ prospect-template/
     └── requirements.txt
 ```
 
-Each working folder has a short `CONTEXT.md` and one `procedure.md`. The numbers show the usual progression; start at the stage your request needs. Optional workflows remain separate.
+Each working folder has a short `CONTEXT.md` with scoped inputs, numbered steps, review checkpoints, an Audit and named outputs. One `procedure.md` owns the detailed rules and report examples. The numbers show the usual progression; start at the stage your request needs. Optional workflows remain separate.
+
+This adapts the ICM stage contract to chat and native-provider outputs; setup uses ignored local files. Add supporting reference files only when needed. The [workspace contract](CONTEXT.md) records the layout and output boundaries.
 
 Hidden `.agents/skills/` supplies the skill commands, `.github/workflows/` runs CI, and `.local/` holds private configuration and setup artifacts created as needed. `.local/` is ignored by Git. Start with the [setup guide](setup/references/installation.md).
 

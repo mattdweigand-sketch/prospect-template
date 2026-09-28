@@ -7,7 +7,7 @@ next: prospect-setup prepare/apply lifecycle
 
 # signal-refresh
 
-Refresh readable ICP, signals, messaging or voice from reviewed source changes. Read `setup/references/installation.md`, `setup/references/source-format.md`, and the complete `setup/procedure.md`. This workflow never contacts prospects or writes to the source repository.
+Refresh readable ICP, signals, messaging or voice from reviewed source changes. Read this workflow's `CONTEXT.md` and scoped inputs; honor its checkpoint and run its Audit before presenting the prepared review. Paths below are relative to the repo root. Read `setup/references/installation.md`, `setup/references/source-format.md`, and the complete `setup/procedure.md`. This workflow never contacts prospects or writes to the source repository.
 
 ## Steps
 
@@ -15,7 +15,8 @@ Refresh readable ICP, signals, messaging or voice from reviewed source changes. 
 2. Run `python3 _system/scripts/refresh_sources.py --revision <full-commit>`. Review every changed, missing or nonregular watched file and any configured contradiction register. Inspect related new source files for missing watch coverage. A no-change result covers watched bytes only; it does not establish continued truth.
 3. For a same-repository update, run the command with `--stage-run <new-run-id>`. For newly supplied materials, use `_system/scripts/source_snapshot.py` with the previous snapshot and a new destination, then initialize a setup update and compare committed old/new watch files explicitly. Record both revisions and all affected claims in the staged review context.
 4. Update only affected configuration plus necessary watch coverage, preserving unrelated settings. Remove unsupported claims, retain source attribution and limits, and update exact quotes. Source deletion, contradiction or retirement requires meaning review; do not patch wording merely to satisfy quote matching. Review dates may advance only after actual review.
-5. Refresh the three synthetic previews and record actual meaning review. Follow the setup procedure's validation, prepare, exact user approval and apply steps. No automatic application, including an unchanged wording/date-only update. Re-run preflight for the next requested workflow.
+5. Refresh the three synthetic previews and record actual meaning review. Follow the setup procedure's validation and prepare steps. Run the contract Audit, then present the complete prepared review, SHA, changed sources and claim decisions. Stop for exact user approval.
+6. After that approval, follow the setup procedure's apply and receipt verification steps. Changed inputs require a new prepare and review. No automatic application, including an unchanged wording/date-only update. Re-run preflight for the next requested workflow.
 
 ## Output and stop conditions
 

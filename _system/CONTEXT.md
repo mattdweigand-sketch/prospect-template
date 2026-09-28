@@ -1,6 +1,6 @@
 # Workspace maintenance
 
-Implementation and verification live here so the working folders contain only their contracts and procedures.
+Implementation and verification live here; working folders own their contracts, procedures and any needed supporting references.
 
 | Folder or file | Owns |
 |---|---|

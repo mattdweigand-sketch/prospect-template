@@ -2,27 +2,53 @@
 
 ## Inputs
 
-| Kind | Path or source | Load / purpose |
-|---|---|---|
-| Reference | `../../.local/config/policy.yaml` | outreach, approval, identity, user_scan |
-| Reference | `../../.local/config/talk-track.md` | Core messaging, applicable Match the angle row, Claim boundaries; supporting evidence only for claims used |
-| Reference | `../../.local/config/icp.md` | Relevant Target personas section |
-| Tool | `../../_system/scripts/outreach_gate.py`; `../../_system/scripts/readback_check.py` | Packet checks and approved-field readback |
-| Tool | `../../_system/scripts/lint_draft.py` | Bundled advisory style review |
-| Working | Qualified bundle in this thread; recipient sources and current CRM/email provider activity reads | No bundle reconstruction from memory or summaries |
+| Source | File/Location | Section/Scope | Why |
+|---|---|---|---|
+| Procedure | `procedure.md` | Full file | Detailed steps, report and stop conditions |
+| Reference | `../../shared/providers.md` | Full file | Tool discovery, complete reads, mappings and write/readback rules |
+| Settings | `../../.local/config/policy.yaml` | outreach, approval, identity, user_scan | Installed values and boundaries |
+| Reference | `../../.local/config/talk-track.md` | Core messaging, applicable Match the angle row, Claim boundaries; evidence for claims used | One supported angle |
+| Reference | `../../.local/config/icp.md` | Relevant Target personas section | Recipient responsibility |
+| Tool | `../../_system/scripts/outreach_gate.py`; `../../_system/scripts/readback_check.py`; `../../_system/scripts/lint_draft.py` | CLI and packet docstrings as used | Gate, native readback and advisory style review |
+| Working | Qualified bundle in this thread; recipient sources and current CRM/email reads | Original bundle and complete activity reads | No reconstruction from memory or summaries |
 
 ## Process
 
-Follow `procedure.md`: verify the recipient responsibility, choose one angle, check activity and wording, then propose exact draft fields. Discovery catalog content is not an input.
+Step numbers match `procedure.md`; it owns the detailed rules.
 
-## Output
+1. Read scoped settings, talk track and persona guidance.
+2. Verify the same-thread qualified bundle and evidence freshness.
+3. Verify the recipient and responsibility.
+4. Read ownership, deals and complete suppression activity.
+5. Choose one supported angle for that responsibility.
+6. Write the draft; review meaning, claims and style.
+7. Run the outreach gate.
+8. Run the Audit; present exact canonical and native draft fields, with empty CC/BCC; stop.
+9. After exact approval and fresh revalidation, create the draft and verify complete native message readback.
+10. Enter follow-up only after the user sends manually.
 
-One numbered proposal in the thread; one email draft after approval and exact readback. Nothing is written to this folder.
+## Checkpoints
 
-## Human check
+| After Step | Agent Presents | Human Decides |
+|---|---|---|
+| 8 | Numbered To, Subject, Body, empty CC/BCC, mapped payload and supporting evidence | Approve those exact fields; any change requires a new proposal |
 
-Approve exact To, Subject and Body. A passing gate does not establish source meaning, recipient fit or claim support. the seller sends manually.
+## Audit
+
+| Check | Pass Condition |
+|---|---|
+| Recipient and angle | Responsibility is evidenced and the angle addresses the supported initiative. |
+| Claims and voice | Wording respects source limits, permissions, configured voice and bundle boundaries. |
+| Readiness | Current complete activity checks and the outreach gate allow this proposal. |
+| Completion | Approved fields, including CC/BCC, match complete native readback. |
+
+## Outputs
+
+| Artifact | Location | Format |
+|---|---|---|
+| Draft proposal | Current chat | Numbered canonical fields, exact native payload and evidence |
+| Approved draft | Native email provider | Unsent draft plus draft/message IDs and readback result |
 
 ## Next
 
-`../04-followup/` after a proven send.
+`../04-followup/` after a proven send. The seller sends manually.

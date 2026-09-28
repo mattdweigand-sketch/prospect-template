@@ -9,7 +9,7 @@ next: signal-scan for eligible adoption rows, signal-outreach for verified claim
 
 Discovers companies showing the configured buying signals, proves the evidence, routes each against CRM, and proposes claims. Every CRM write is a numbered proposal with its own approval. Writes nothing else anywhere.
 
-Read this workflow's `CONTEXT.md` before the steps. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
+Read this workflow's `CONTEXT.md` and its scoped inputs before the steps. Run its Audit before presenting the report or proposal, and its completion checks after any approved write. Honor its conditional checkpoints. Paths below are relative to the repo root. Use temporary sandbox files for checks; never store customer material in the checkout.
 
 ## Before starting
 
