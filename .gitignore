@@ -1,0 +1,10 @@
+# Local configuration, permitted source snapshots, reviews and query mappings
+.local/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+.env
+.env.*
+!.env.example
