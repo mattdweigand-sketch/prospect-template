@@ -41,78 +41,22 @@ CRM and email providers are configurable. Setup maps your available tools, recor
 
 ```text
 prospect-template/
-├── AGENTS.md                         # Routes requests to workflows
-├── CONTEXT.md                        # Handoffs, approvals and storage rules
-│
-├── .agents/
-│   └── skills/                       # Eight small workflow entry points
-│
-├── workflows/
-│   ├── prospect-setup/
-│   ├── signal-refresh/
-│   ├── signal-prospector/
-│   ├── signal-scan/
-│   ├── signal-user-scan/
-│   ├── signal-outreach/
-│   ├── signal-followup/
-│   └── signal-arr-growth/
-│
-├── setup/                            # Onboarding and provider guides
-│   ├── CONTEXT.md
-│   ├── installation.md
-│   ├── questionnaire.md
-│   ├── providers.md
-│   ├── source-format.md
-│   └── subscription-interface.md
-│
-├── examples/
-│   └── config/                       # Fictional starter configuration
-│       ├── policy.yaml
-│       ├── icp.md
-│       ├── signals.md
-│       ├── talk-track.md
-│       ├── voice.md
-│       ├── providers.yaml
-│       └── sources.json
-│
-├── _shared/
-│   ├── CONTEXT.md
-│   └── scripts/                      # Shared gates and provider mapping
-│
-├── scripts/                          # Setup, refresh, preflight and maintenance
-│
-├── _templates/
-│   └── workflow/                     # Starter files for a new workflow
-│       ├── CONTEXT.md
-│       └── procedure.md
-│
-├── tests/                            # Synthetic workflow and setup tests
-├── .github/
-│   └── workflows/
-│       └── checks.yml                # Python 3.9 and 3.13 CI
-│
-├── docs/
-│   └── BUILD-REPORT.md
-│
-├── .local/                           # Created as needed; ignored by Git
-│   ├── config/                       # Installed business and provider settings
-│   ├── setup/                        # Proposals, reviews and receipts
-│   ├── sources/                      # Permitted source snapshots
-│   └── queries/                      # Reviewed private warehouse queries
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
-└── LICENSE
+├── AGENTS.md          # Routes Codex requests
+├── CONTEXT.md         # Shared workflow rules
+├── .agents/skills/    # Skill commands
+├── workflows/         # Eight workflow procedures
+├── setup/             # Setup guides
+├── examples/config/   # Starter settings
+├── _shared/           # Shared checks
+├── scripts/           # Setup and maintenance tools
+├── _templates/        # New workflow starters
+├── tests/             # Automated tests
+├── .github/           # GitHub checks
+├── docs/              # Project notes
+└── .local/            # Your local settings and setup files
 ```
 
-Each folder under `workflows/` contains a `CONTEXT.md` contract and a `procedure.md`.
-Workflow-specific Python checks and SQL files sit beside those instructions.
-The corresponding entry in `.agents/skills/` contains a small `SKILL.md` pointer.
-
-Start with [setup](setup/installation.md). [Provider contracts](setup/providers.md)
-explain how CRM and email connect. Operational results live in chat and native
-provider records; temporary customer files stay outside the checkout.
+`.local/` is created as needed and ignored by Git. Start with the [setup guide](setup/installation.md).
 
 ## Maintenance
 
