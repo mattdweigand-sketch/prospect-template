@@ -66,6 +66,235 @@ class SetupLifecycle(unittest.TestCase):
         setup.prepare('initial',self.root)
         return setup.apply('initial','synthetic approval, not a real user',self.root)
 
+    def frontmatter(self, filename, change):
+        path = self.config / filename
+        _, header, body = path.read_text().split('---', 2)
+        data = yaml.safe_load(header)
+        change(data)
+        path.write_text('---\n' + yaml.safe_dump(data) + '---' + body)
+
+    def connect_synthetic_providers(self):
+        import provider_map
+        path = self.config / 'providers.yaml'
+        providers = yaml.safe_load(path.read_text())
+        providers['systems'] = {'crm': 'Synthetic CRM', 'email': 'Synthetic Mail'}
+        providers['records'] = {name: {field: {'path': '/' + field} for field in fields}
+                                for name, fields in provider_map.CONTRACTS.items()}
+        for capability in providers['capabilities'].values():
+            capability.update(tool='synthetic_tool', input_mapping='synthetic fields',
+                              output_mapping='synthetic fields', completion='all pages complete',
+                              verification_reference='synthetic schema')
+        path.write_text(yaml.safe_dump(providers))
+
+    def enable_query(self, name):
+        path = self.root / '.local/queries' / (name + '.sql')
+        path.parent.mkdir(exist_ok=True)
+        path.write_text('-- Synthetic query for local lifecycle checks only; no live compatibility claim.\nSELECT 1\n')
+        def configure(p):
+            p['warehouse'].update(enabled=True, name='SYNTHETIC_WH')
+            p['warehouse']['queries'][name] = {'path': str(path.relative_to(self.root)), 'sha256': sc.digest(path)}
+        self.policy(configure)
+        return path
+
+    def enable_arr(self):
+        path = self.enable_query('arr_growth_source')
+        def configure(p):
+            p['arr_growth']['enabled'] = True
+            p['arr_growth']['draft'].update(subject='Your Supplier Brief Service subscription',
+                body='Thank you for using Supplier Brief Service. Would a review of the subscription options help?\n\nBest,\nAlex')
+        self.policy(configure)
+        return path
+
+    def test_incomplete_icp_blocks_prepare_and_preserves_active_configuration(self):
+        self.prepare_apply()
+        active = sc.hashes(self.root / '.local/config')
+        original = (self.config / 'icp.md').read_bytes()
+        mutations = [lambda d: d.pop('verticals'), lambda d: d.pop('disqualifiers'),
+                     lambda d: d['disqualifiers'].pop('hard'),
+                     lambda d: d['disqualifiers'].update(recoverable='unclear_project'),
+                     lambda d: d['verticals'][0].update(rank=True),
+                     lambda d: d['verticals'][0].update(rank=0),
+                     lambda d: d['verticals'][0].update(id=' '),
+                     lambda d: d['verticals'].append(dict(d['verticals'][0])),
+                     lambda d: d['disqualifiers']['recoverable'].append('automated_purchase_required')]
+        for change in mutations:
+            (self.config / 'icp.md').write_bytes(original)
+            self.frontmatter('icp.md', change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                setup.prepare('initial', self.root)
+            self.assertEqual(sc.hashes(self.root / '.local/config'), active)
+
+    def test_signal_structure_blocks_setup_before_consumer_failure(self):
+        original = (self.config / 'signals.md').read_bytes()
+        mutations = [lambda d: d['tiers'].pop('tier2'), lambda d: d['tiers'].update(tier4=[]),
+                     lambda d: d['tiers']['tier1'][0].update(freshness_days=False),
+                     lambda d: d['tiers']['tier1'][0].update(source=[]),
+                     lambda d: d['tiers']['tier2'].append(dict(d['tiers']['tier1'][0])),
+                     lambda d: d['admission'].pop('tier2_min')]
+        for change in mutations:
+            (self.config / 'signals.md').write_bytes(original)
+            self.frontmatter('signals.md', change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                setup.prepare('initial', self.root)
+        self.assertFalse((self.root / '.local/config').exists())
+
+    def test_policy_element_contracts_and_followup_placeholders(self):
+        path = self.config / 'policy.yaml'; original = path.read_bytes()
+        mutations = [lambda p: p['crm'].update(house_owner_ids=[{}]),
+                     lambda p: p['outreach'].update(suppressing_task_subtypes=[]),
+                     lambda p: p['user_scan']['bundle_keys'].update(account_name='number'),
+                     lambda p: p['user_scan'].update(adoption_values=['unknown']),
+                     lambda p: p['followup']['task'].update(subject='Follow up {unknown}'),
+                     lambda p: p['followup']['task'].update(description='From {angle.name}'),
+                     lambda p: p['followup']['task'].update(description='From {angle!r}'),
+                     lambda p: p['followup']['task'].update(description='From {angle:{message_id}}'),
+                     lambda p: p['followup']['task'].update(description='From {angle')]
+        for change in mutations:
+            path.write_bytes(original); self.policy(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                setup.prepare('initial', self.root)
+
+    def test_angle_and_legacy_unit_render_through_applied_followup(self):
+        from test_followup_gate import fg, BASE
+        self.policy(lambda p: p['followup']['task'].update(description='Follow up on {angle}; legacy {unit}; message {message_id}; {thread_id}; {signal_type}'))
+        self.prepare_apply()
+        policy = yaml.safe_load((self.root / '.local/config/policy.yaml').read_text())
+        packet = copy.deepcopy(BASE)
+        packet['account']['owner_id'] = policy['identity']['crm_user_id']
+        packet['sent'][0]['sent_at'] = datetime.now(timezone.utc).isoformat()
+        packet['signal'] = {'signal_type': 'retired_signal', 'angle': 'Historical service angle'}
+        out = fg.check(packet, 'standard', policy)
+        self.assertEqual(out['verdict'], 'allow')
+        self.assertEqual(out['task']['description'], 'Follow up on Historical service angle; legacy Historical service angle; message m1; t1; retired_signal')
+
+    def test_valid_empty_preferences_and_tiers_are_consumable(self):
+        import common
+        import route_candidate
+        self.frontmatter('icp.md', lambda d: d.update(verticals=[], disqualifiers={'hard': [], 'recoverable': []}))
+        self.frontmatter('signals.md', lambda d: d['tiers'].update(tier2=[], tier3=[]))
+        self.prepare_apply()
+        active = self.root / '.local/config'
+        route_candidate.load_rules(active)
+        self.assertEqual(common.taxonomy_entry(common.load_taxonomy(active), 'absent'), (None, None))
+
+    def test_runtime_messaging_expiry_scoped_to_new_outreach(self):
+        from test_followup_gate import fg, BASE
+        self.enable_arr()
+        self.enable_query('adoption_lookup')
+        self.policy(lambda p: p['user_scan'].update(enabled=True, statements={'org_adopted': 'Supplier Brief Service is adopted.', 'individuals_only': 'Individuals subscribe to Supplier Brief Service.'}))
+        self.connect_synthetic_providers(); self.prepare_apply()
+        future = date.today() + timedelta(days=31)
+        with mock.patch.object(vs.common, 'policy_today', return_value=future):
+            for workflow in ('signal-followup', 'signal-scan', 'signal-prospector', 'signal-user-scan', 'signal-arr-growth'):
+                self.assertEqual(preflight.check(workflow, self.root)['status'], 'configured_needs_live_reads')
+            with self.assertRaisesRegex(ValueError, 'past its review date'):
+                preflight.check('signal-outreach', self.root)
+            # A newly proven send remains actionable using its historical labels.
+            policy = yaml.safe_load((self.root / '.local/config/policy.yaml').read_text())
+            packet = copy.deepcopy(BASE)
+            packet['account']['owner_id'] = policy['identity']['crm_user_id']
+            packet['sent'][0]['sent_at'] = future.isoformat() + 'T09:00:00+00:00'
+            self.assertEqual(fg.check(packet, 'standard', policy, today=future)['verdict'], 'allow')
+
+    def test_external_source_loss_does_not_block_historical_followup(self):
+        self.connect_synthetic_providers(); self.prepare_apply()
+        self.source.rename(self.root / 'unavailable-source')
+        self.assertEqual(preflight.check('signal-followup', self.root)['status'], 'configured_needs_live_reads')
+        with self.assertRaises((ValueError, OSError, subprocess.CalledProcessError)):
+            preflight.check('signal-outreach', self.root)
+        # Full setup validation still requires all pinned evidence.
+        with self.assertRaises((ValueError, OSError, subprocess.CalledProcessError)):
+            vs.validate(self.config, self.root)
+
+    def test_missing_arr_query_does_not_block_public_workflows(self):
+        query = self.enable_arr(); self.connect_synthetic_providers(); self.prepare_apply()
+        query.unlink()
+        for workflow in ('signal-scan', 'signal-prospector', 'signal-followup', 'signal-outreach'):
+            self.assertEqual(preflight.check(workflow, self.root)['status'], 'configured_needs_live_reads')
+        with self.assertRaisesRegex(ValueError, 'query hash mismatch: arr_growth_source'):
+            preflight.check('signal-arr-growth', self.root)
+        with self.assertRaisesRegex(ValueError, 'query hash mismatch'):
+            vs.validate(self.config, self.root)
+
+    def test_apply_rechecks_external_dependencies(self):
+        query = self.enable_arr(); setup.prepare('initial', self.root)
+        query.write_text('Changed after preparation')
+        with self.assertRaisesRegex(ValueError, 'query hash mismatch'):
+            setup.apply('initial', 'synthetic', self.root)
+        self.assertFalse((self.root / '.local/config').exists())
+
+    def test_active_hash_check_still_applies_to_all_runtime_workflows(self):
+        self.enable_arr(); self.connect_synthetic_providers(); self.prepare_apply()
+        path = self.root / '.local/config/talk-track.md'
+        path.write_text(path.read_text() + '\nChanged meaning\n')
+        for workflow in preflight.CAPABILITIES:
+            with self.subTest(workflow=workflow), self.assertRaisesRegex(ValueError, 'changed after approval'):
+                preflight.check(workflow, self.root)
+
+    def test_enabled_arr_rejects_fictional_copy_and_invalid_rendering(self):
+        self.enable_query('arr_growth_source')
+        self.policy(lambda p: p['arr_growth'].update(enabled=True))
+        with self.assertRaisesRegex(ValueError, 'fictional copy'):
+            setup.prepare('initial', self.root)
+        self.enable_arr()
+        path = self.config / 'policy.yaml'; original = path.read_bytes()
+        mutations = [lambda p: p['arr_growth']['draft'].update(body='Thank you.\nSeller'),
+                     lambda p: p['arr_growth']['draft'].update(subject='example offer'),
+                     lambda p: p['arr_growth']['draft'].update(greeting_person='Hi {account_name},'),
+                     lambda p: p['arr_growth']['draft'].update(greeting_team='Hi {first_name},'),
+                     lambda p: p['arr_growth']['draft'].update(body='Your amount is {amount}'),
+                     lambda p: p['arr_growth']['draft'].update(subject='ARR increased'),
+                     lambda p: p['arr_growth'].update(draft_forbidden_pattern='[')]
+        for change in mutations:
+            path.write_bytes(original); self.policy(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                setup.prepare('initial', self.root)
+
+    def test_enabled_arr_review_matches_actual_gate_draft(self):
+        from test_arr_growth_gate import ag, row
+        self.enable_arr(); self.connect_synthetic_providers(); self.prepare_apply()
+        active = self.root / '.local/config'
+        policy = yaml.safe_load((active / 'policy.yaml').read_text())
+        record = row(account={'owner_id': policy['identity']['crm_user_id'], 'name': 'Synthetic Buyer'},
+                     contacts=[{'id': 'contact-123', 'email': 'jordan@buyer.example', 'first_name': 'Jordan'}],
+                     billing_email='jordan@buyer.example')
+        today = vs.common.policy_today(policy)
+        result = ag.check({'data_through_date': (today - timedelta(days=1)).isoformat(), 'rows': [record]}, policy, today, active)
+        self.assertEqual(result['verdict'], 'allow')
+        draft = result['selected'][0]['draft']
+        self.assertEqual(draft, vs.validate(active, self.root)['module_previews']['arr_growth_person'])
+        self.assertIn('Supplier Brief Service', draft['subject'])
+        self.assertIn('Alex', draft['body'])
+        review = (self.run / 'review.md').read_text()
+        self.assertIn('Enabled optional-module previews', review)
+        self.assertIn('Hi Synthetic Buyer team,', review)
+        self.assertIn('Hi Jordan,', review)
+        self.assertEqual(preflight.check('signal-arr-growth', self.root)['status'], 'configured_needs_live_reads')
+
+    def test_enabled_adoption_copy_requires_replacement_and_review(self):
+        self.enable_query('adoption_lookup')
+        self.policy(lambda p: p['user_scan'].update(enabled=True))
+        with self.assertRaisesRegex(ValueError, 'fictional copy'):
+            setup.prepare('initial', self.root)
+        def configure(p):
+            p['user_scan']['statements'] = {'org_adopted': 'Supplier Brief Service is adopted by the organization.',
+                'individuals_only': 'Individuals pay for Supplier Brief Service.'}
+        self.policy(configure); self.prepare_apply()
+        review = (self.run / 'review.md').read_text()
+        self.assertIn('Enabled optional-module previews', review)
+        self.assertIn('Individuals pay for Supplier Brief Service.', review)
+
+    def test_adoption_discovery_requires_supported_signal_and_own_query(self):
+        query = self.enable_query('adoption_territory')
+        self.policy(lambda p: p['prospector']['adoption_source'].update(enabled=True, signal_type='paid_individuals_present'))
+        with self.assertRaisesRegex(ValueError, 'counted warehouse signal'):
+            vs.validate(self.config, self.root)
+        self.frontmatter('signals.md', lambda d: d['tiers']['tier2'].append({'id': 'paid_individuals_present', 'freshness_days': 1, 'source': 'reviewed adoption query'}))
+        self.connect_synthetic_providers(); self.prepare_apply(); query.unlink()
+        self.assertEqual(preflight.check('signal-scan', self.root)['status'], 'configured_needs_live_reads')
+        with self.assertRaisesRegex(ValueError, 'query hash mismatch: adoption_territory'):
+            preflight.check('signal-prospector', self.root)
+
     def test_service_setup_without_providers_or_warehouse(self):
         result=vs.validate(self.config,self.root)
         self.assertEqual(result['claims_checked'],1)

@@ -14,11 +14,13 @@ Read supplied documents first. Extract candidate answers with source references 
 | Modules | Public prospecting by default; adoption discovery, account adoption and ARR enabled only if the business has the necessary model and reviewed warehouse access |
 | Providers | Actual available tool names, input/output fields, pagination/completion, native readback; missing tools stay explicitly missing |
 | Source and retention | Existing Git source at a full commit, or permitted local snapshots of supplied original bytes; redaction, local retention, backup and who can access them |
-| Review | Messaging review date; explicit meaning review of all seven configuration files, source limits and three synthetic fit previews |
+| Review | Messaging review date; explicit meaning review of all seven configuration files, source limits, three synthetic fit previews and exact enabled-module previews |
 
-For a service business, describe deliverables and buyer work without inventing subscriptions, software capabilities or adoption data. Define signals and responsibilities from that service and the buyer's work. Do not import software assumptions. Keep specialized modules disabled.
+For a service business, describe deliverables and buyer work without inventing subscriptions, software capabilities or adoption data. Define signals and responsibilities from that service and the buyer's work. Do not import software assumptions. Keep specialized modules disabled unless the business model requires them.
 
 Show a clear-fit draft, an indirect-fit case needing research, and a poor-fit rejection. Explain why each decision follows from the offer and evidence. Do not convert enthusiasm or a senior title into buying intent. Mechanical source matching is separate from this meaning review.
+
+When enabling adoption or ARR, separately replace and review its statements or fixed draft, including seller signature and both greeting forms. Setup renders these from the proposed policy into the exact review. For ARR, confirm upstream USD normalization and the reviewed FX rate source/date and calculation rules; a currency label alone cannot prove the conversion.
 
 ## CRM and email choices
 

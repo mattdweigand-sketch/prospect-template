@@ -47,6 +47,7 @@ warehouse:
       path: null
       sha256: null
 user_scan:
+  # Replace these statements and review their generated preview before enabling.
   statements:
     org_adopted: Example Offer is already adopted at the organization.
     individuals_only: People at the organization already pay for Example Offer individually.
@@ -151,6 +152,7 @@ arr_growth:
   territory: .local/config/icp.md frontmatter
   recipient_platform: web
   suppression_days: 30
+  # Replace fixed copy and signature; setup previews both greetings before enabling.
   draft:
     subject: Your Example Offer subscription
     greeting_person: Hi {first_name},

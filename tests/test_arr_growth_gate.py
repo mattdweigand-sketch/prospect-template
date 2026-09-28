@@ -25,7 +25,7 @@ TODAY = date(2026, 9, 21)
 
 ROW = {
     "organization_uuid": "org-1", "organization_name": "Acme", "crm_account_id": "001A",
-    "baseline_arr_usd": 1200.0, "current_arr_usd": 2400.0, "net_change_usd": 1200.0,
+    "currency": "USD", "baseline_arr_usd": 1200.0, "current_arr_usd": 2400.0, "net_change_usd": 1200.0,
     "observed_dates": 31, "required_dates": 31,
     "subscription_platform": "web", "billing_email": "jane@acme.example", "communications_enabled": True,
     "account": {"exists": True, "name": "Acme", "website": "https://acme.example", "owner_id": SELLER, "owner_is_active": True,
@@ -52,6 +52,24 @@ def run(*rows):
 
 
 class Allow(unittest.TestCase):
+    def test_unconverted_or_missing_currency_rejected(self):
+        for currency in ('EUR', 'GBP', '', None):
+            with self.subTest(currency=currency), self.assertRaisesRegex(ValueError, 'currency must be USD'):
+                run(row(currency=currency))
+        record = row(); del record['currency']
+        with self.assertRaisesRegex(ValueError, 'currency'):
+            run(record)
+
+    def test_explicit_upstream_usd_normalization_is_compatible(self):
+        # Synthetic EUR amounts converted upstream at a reviewed fixed rate. The gate
+        # verifies declared units and arithmetic, not the provenance of that FX rate.
+        record = row(currency='USD', baseline_arr_usd=1000 * 1.2,
+                     current_arr_usd=2000 * 1.2, net_change_usd=1000 * 1.2)
+        out = run(record)
+        self.assertEqual(out['verdict'], 'allow')
+        self.assertEqual(out['selected'][0]['currency'], 'USD')
+        self.assertEqual(out['selected'][0]['net_change_usd'], 1200)
+
     def test_person_greeting_and_template(self):
         out = run(row())
         self.assertEqual(out["verdict"], "allow")

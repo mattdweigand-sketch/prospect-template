@@ -2,7 +2,7 @@
 """Check one outreach packet before an email draft proposal. Never sends or proves approval.
 
 Caller: signal-outreach. Usage: python3 workflows/signal-outreach/outreach_gate.py --packet p.json
-[--shared _shared] [--now ISO-with-offset]. --now is for tests only.
+[--shared .local/config] [--now ISO-with-offset]. --now is for tests only.
 
 Packet:
   bundle: the current evidence_gate bundle (classification active_initiative, relevance relevant_to_offer),
@@ -30,6 +30,8 @@ and the seller's exact proposal approval. There are no numbered answers or evide
 Flags: capability wording marked verify_before_action is advisory. No flag authorizes a write.
 Exit 0 allow, 1 block, 2 unusable input; always JSON. Required reads and exact approval/readback are
 performed by the procedure; a fabricated packet is not proof of provider reads or human approval.
+
+--shared defaults to .local/config (or PROSPECT_CONFIG_DIR); use a separate fixture directory only for tests.
 """
 import argparse
 import json

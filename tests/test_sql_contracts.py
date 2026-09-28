@@ -1,8 +1,9 @@
-"""Static SQL contracts plus a SQLite relational fixture for discovery. No warehouse is touched.
+"""Static SQL contracts plus a SQLite relational fixtures for discovery and ARR. No warehouse is touched.
 
 The fixture substitutes equivalent scalar/boolean functions; it does not validate Snowflake syntax or schemas.
 """
 import _support
+from datetime import date, timedelta
 import re
 import sqlite3
 import unittest
@@ -53,6 +54,44 @@ class SqlContracts(unittest.TestCase):
         sql = QUERIES["arr_growth_source.sql"].read_text()
         self.assertIn("Dropped orgs are not reported", sql)
         self.assertIn("Dropped orgs are not reported", (SHARED / "policy.yaml").read_text())
+
+    def test_arr_query_excludes_non_usd_and_incomplete_daily_units(self):
+        db = sqlite3.connect(':memory:'); self.addCleanup(db.close)
+        db.row_factory = sqlite3.Row
+        db.create_function('TO_DATE', 1, lambda value: value)
+        db.create_function('TO_CHAR', 2, lambda value, fmt: value)
+        db.create_function('DATEADD', 3, lambda unit, days, value: (date.fromisoformat(value) + timedelta(days=days)).isoformat())
+        db.executescript("""
+          CREATE TABLE account (id TEXT, owner_id TEXT, is_deleted BOOL);
+          CREATE TABLE organizations (organization_uuid TEXT, billing_email TEXT, outreach_permitted BOOL, is_deleted BOOL, service_type TEXT);
+          CREATE TABLE organization_account_map (organization_uuid TEXT, crm_account_id TEXT, is_unambiguous BOOL);
+          CREATE TABLE organization_subscription_daily (organization_uuid TEXT, snapshot_date TEXT, organization_name TEXT, subscription_platform TEXT, annual_recurring_revenue REAL, currency TEXT);
+          INSERT INTO account VALUES ('account-123', 'owner-123', FALSE);
+          INSERT INTO organizations VALUES ('org-1', 'billing@buyer.example', TRUE, FALSE, 'SELF_SERVE');
+          INSERT INTO organization_account_map VALUES ('org-1', 'account-123', TRUE);
+          INSERT INTO organization_subscription_daily VALUES
+            ('org-1', '2026-09-20', 'Buyer', 'web', 1200, 'USD'),
+            ('org-1', '2026-09-21', 'Buyer', 'web', 1800, 'USD'),
+            ('org-1', '2026-09-22', 'Buyer', 'web', 2400, 'USD');
+        """)
+        # Adapt only dialect functions; exercise the shipped query's grouping/filtering.
+        sql = QUERIES['arr_growth_source.sql'].read_text().replace('prospect_source.', '')
+        sql = sql.replace('BOOLAND_AGG(', 'MIN(').replace('DATEADD(day,', "DATEADD('day',")
+        def rows():
+            return db.execute(sql, ('2026-09-22', 2, 'owner-123', 20)).fetchall()
+        result = rows()
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['currency'], 'USD')
+        self.assertEqual(result[0]['net_change_usd'], 1200)
+        for currency in ('EUR', 'GBP', None, ''):
+            with self.subTest(currency=currency):
+                db.execute('UPDATE organization_subscription_daily SET currency = ?', (currency,))
+                self.assertEqual(rows(), [])
+        db.execute("UPDATE organization_subscription_daily SET currency = 'USD'")
+        db.execute("UPDATE organization_subscription_daily SET currency = 'EUR' WHERE snapshot_date = '2026-09-21'")
+        self.assertEqual(rows(), [])
+        db.execute("UPDATE organization_subscription_daily SET currency = 'USD'")
+        self.assertEqual(len(rows()), 1)
 
     def test_discovery_domain_uniqueness_and_deleted_org_behavior(self):
         db = sqlite3.connect(":memory:")

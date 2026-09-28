@@ -57,6 +57,8 @@ def prepare(run_id, root=sc.ROOT):
         after = (proposal / name).read_text()
         report += ['## ' + name, '', '```diff', ''.join(difflib.unified_diff(before.splitlines(True),after.splitlines(True),fromfile='active/'+name,tofile='proposal/'+name)).rstrip(), '```', '', '### Complete proposed file', '', '````', after.rstrip(), '````', '']
     report += ['## Synthetic previews', '', '```json', json.dumps(previews, indent=2), '```', '', 'Approval covers these exact files only. Provider availability and message meaning need separate review. Changed bytes require prepare and fresh approval.']
+    if result['module_previews']:
+        report += ['', '## Enabled optional-module previews', '', 'Review both greetings, fixed copy and adoption statements for the configured offer. These samples are rendered from the proposed policy, not generated outreach.', '', '```json', json.dumps(result['module_previews'], indent=2), '```']
     review_path = sc.relative_path(run, 'review.md')
     review_path.write_text('\n'.join(report) + '\n')
     receipt = {'schema_version':1,'run':run_id,'preimages':pre,'postimages':result['files'], 'previews_sha256':sc.digest(preview_path), 'review_sha256':sc.digest(review_path), 'source_revision':result['source_revision']}

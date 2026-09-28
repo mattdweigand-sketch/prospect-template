@@ -2,7 +2,7 @@
 """Admit and route one net-new candidate account. signal-prospector calls this once per candidate.
 
 Usage:
-    python3 _shared/scripts/route_candidate.py --receipt receipt.json [--shared _shared]
+    python3 _shared/scripts/route_candidate.py --receipt receipt.json [--shared .local/config]
 
 receipt.json
     {
@@ -35,6 +35,8 @@ A claim route is only emitted when admitted, in territory, and free of hard disq
 `claimable` is false. `vertical_rank` is the icp.md rank or null. An unknown vertical or disqualifier id is exit 2.
 
 Exit 0 verdict JSON on stdout. Exit 2 unusable input, {"verdict": "error", "reason": ...}. Never a traceback.
+
+--shared defaults to .local/config (or PROSPECT_CONFIG_DIR); use a separate fixture directory only for tests.
 """
 import argparse
 import json

@@ -59,3 +59,9 @@ The checks establish local mechanics, not source truth, permission, actual user 
 The GitHub Actions workflow tests Python 3.9 and 3.13 on pushes and pull requests. Local build verification used Python 3.9.6; consult the checks for the published commit for remote results. Codex's documented .agents/skills layout is validated, but skill-menu discovery has not been smoke-tested in a newly opened project/chat.
 
 Open the repository in Codex, create the local Python environment, select **prospect-setup** from the `/` skill menu, and review the proposed business configuration. Finish provider mappings and authorized read-only compatibility checks for the selected workflow before proposing live writes. Email sending remains manual.
+
+## Setup audit repairs after the build
+
+The subsequent six-finding setup audit was remediated: complete consumed ICP/signal and fixed-template contracts are validated before installation; runtime dependency checks follow the selected workflow while retaining all seven active hashes; enabled optional-module copy rejects starter wording and appears in the exact review; ARR requires upstream USD normalization and explicit currency through query and gate; stale ID-length and configuration-directory guidance is removed. Fixed-template rendering has one shared owner in `_shared/scripts/policy_templates.py`.
+
+The local regression suite now contains **366 tests**, including setup-to-consumer failures, historical follow-up after messaging expiry, isolated optional-query failures, exact optional-module previews, and non-USD/mixed-currency rejection. These tests remain synthetic. The currency fixture adapts SQL dialect functions for SQLite; it does not certify a live warehouse, FX rate or conversion. The earlier build counts above remain the historical baseline.

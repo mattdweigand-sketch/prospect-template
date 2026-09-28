@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Privacy check for the signal-user-scan adoption bundle.
 
-Usage: python3 privacy_check.py --bundle <bundle.json> [--shared _shared]
+Usage: python3 privacy_check.py --bundle <bundle.json> [--shared .local/config]
 
 Reads policy.yaml user_scan.bundle_keys (allowed keys and types) and user_scan.adoption_values.
 Fails when the bundle has a key outside the list, a missing key, a value of the wrong type, a list element
@@ -12,6 +12,8 @@ paid_individuals_exist, else none_found.
 Prints the verdict JSON to stdout.
 
 Exit codes: 0 clean, 1 blocked, 2 usage or input error, {"verdict": "error", "reason": ...}.
+
+--shared defaults to .local/config (or PROSPECT_CONFIG_DIR); use a separate fixture directory only for tests.
 """
 import argparse
 import json

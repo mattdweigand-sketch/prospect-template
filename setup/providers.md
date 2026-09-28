@@ -64,4 +64,4 @@ Follow-up requires one native sent message with `is_sent: true`, a message ID, r
 
 ## Optional warehouse modules
 
-Read `setup/subscription-interface.md` before enabling adoption or ARR. They require reviewed private queries, unambiguous account-to-organization mapping, daily subscription state and complete coverage. Adoption exposes only the allowed aggregate bundle; ARR and billing-source details stay internal. Public signals do not require a warehouse.
+Read `setup/subscription-interface.md` before enabling adoption or ARR. They require reviewed private queries, unambiguous account-to-organization mapping, daily subscription state and complete coverage. ARR additionally requires upstream USD normalization under reviewed FX/date/calculation rules and an explicit USD currency field in each result row. Adoption exposes only the allowed aggregate bundle; ARR and billing-source details stay internal. Public signals do not require a warehouse.

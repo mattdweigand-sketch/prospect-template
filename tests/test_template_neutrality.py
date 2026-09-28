@@ -67,7 +67,7 @@ class TemplateNeutrality(unittest.TestCase):
             self.assertEqual(code,2)
 
     def test_hygiene_detects_vendor_schema_and_legacy_gate_regressions(self):
-        for payload in ('Perplexity','stripe_customer_email','analytics.analytics.table','relevance = employee_use','salesforce.query','gmail.search','SOQL','WhoId'):
+        for payload in ('Perplexity','stripe_customer_email','analytics.analytics.table','relevance = employee_use','salesforce.query','gmail.search','SOQL','WhoId','CRM Account Id (18 char)','--shared _shared'):
             with self.subTest(payload=payload):
                 self.assertTrue(check_repo.neutrality_issues(Path('examples/config/signals.md'),payload))
         self.assertEqual(check_repo.neutrality_issues(Path('setup/providers.md'),'Use configured warehouse tools.'),[])

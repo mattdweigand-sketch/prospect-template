@@ -25,6 +25,8 @@ def neutrality_issues(path, text):
     errors=[]
     if SOURCE_MARKERS.search(text): errors.append('source-specific brand, identity or warehouse field: '+str(path))
     if PROVIDER_ASSUMPTIONS.search(text): errors.append('hardcoded provider assumption: '+str(path))
+    if re.search(r'CRM[^\n]*\b18[- ]char|--shared[ =]+_shared\b', text, re.I):
+        errors.append('stale CRM ID or configuration-directory instruction: '+str(path))
     if LEGACY_RULES.search(text): errors.append('legacy product-specific qualification rule: '+str(path))
     return errors
 

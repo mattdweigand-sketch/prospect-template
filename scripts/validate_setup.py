@@ -16,6 +16,7 @@ import setup_common as sc
 sys.path.insert(0, str(sc.ROOT / '_shared' / 'scripts'))
 import common
 import provider_map
+import policy_templates as templates
 
 
 def require(value, message):
@@ -37,11 +38,15 @@ def shape(value, sample, path='policy'):
             shape(value[key], child, path + '.' + key)
     elif sample is not None:
         require(type(value) is type(sample), path + ' has the wrong type')
+        if isinstance(sample, str):
+            require(text(value), path + ' must be nonblank')
+        if isinstance(sample, list):
+            require(all(text(item) for item in value), path + ' must contain nonblank strings')
 
 
-def validate(folder, root=sc.ROOT, today=None):
-    folder, root = Path(folder), Path(root)
-    sc.hashes(folder)
+def validate_structure(folder):
+    """Check all installed file contracts without reading external dependencies."""
+    folder = Path(folder)
     p = yaml.safe_load((folder / 'policy.yaml').read_text())
     exemplar = yaml.safe_load((sc.ROOT / 'examples/config/policy.yaml').read_text())
     shape(p, exemplar)
@@ -60,7 +65,7 @@ def validate(folder, root=sc.ROOT, today=None):
     require({'send email', 'create deal', 'change deal stage or amount'} <= set(p['approval']['never']), 'retain prohibited writes')
     require(p['outreach']['max_drafts_per_run'] == 1 and p['followup']['max_tasks_per_run'] == 1, 'outreach and followup are single-proposal workflows')
     require(1 <= p['arr_growth']['max_accounts_per_run'] <= 2, 'ARR workflow supports at most two accounts')
-    for section, keys in {'scan':['quote_min_words','max_signals_per_account'], 'outreach':['bundle_checked_max_age_hours','suppression_days','activity_lookback_days'], 'followup':['due_calendar_days','arr_growth_due_business_days'], 'prospector':['max_candidates_per_run','max_people_per_account']}.items():
+    for section, keys in {'scan':['quote_min_words','max_signals_per_account'], 'outreach':['bundle_checked_max_age_hours','suppression_days','activity_lookback_days'], 'followup':['due_calendar_days','arr_growth_due_business_days'], 'prospector':['max_candidates_per_run','max_people_per_account'], 'arr_growth':['window_days','candidate_rows','suppression_days']}.items():
         for key in keys:
             require(type(p[section][key]) is int and p[section][key] > 0, section + '.' + key + ' must be positive')
     require(p['outreach']['activity_lookback_days'] >= p['outreach']['suppression_days'], 'activity reads must cover suppression window')
@@ -72,22 +77,83 @@ def validate(folder, root=sc.ROOT, today=None):
     require(text(p['email_voice']['source_reference']), 'email voice needs a source_reference')
     require(p['retention']['operational_data'] == 'temporary_outside_checkout' and p['retention']['approval_record'] == 'chat_and_provider', 'retain operational data boundaries')
     require(text(p['retention']['review_reference']), 'record the reviewed retention preference')
+    require(p['outreach']['lint']['max_body_words'] > 0, 'lint max_body_words must be positive')
+    require(p['prospector']['adoption_source']['candidate_rows'] > 0, 'adoption candidate_rows must be positive')
+    require(p['outreach']['suppressing_task_subtypes'] and p['outreach']['recipient_sources'], 'outreach source and subtype lists must be nonempty')
+    require(p['user_scan']['bundle_keys'] == exemplar['user_scan']['bundle_keys'], 'user_scan.bundle_keys must match the supported record contract')
+    require(sorted(p['user_scan']['adoption_values']) == sorted(exemplar['user_scan']['adoption_values']), 'unsupported adoption values')
+    templates.render(p['followup']['task']['subject'], email_subject='Synthetic subject')
+    templates.followup_description(p['followup']['task']['description'], 'synthetic-message', 'synthetic-thread', 'synthetic-signal', 'Synthetic angle')
     icp = common.icp_frontmatter(folder)
-    territory = icp['territory']
-    require(type(territory['min_employees']) is int and type(territory['max_employees']) is int and 0 < territory['min_employees'] <= territory['max_employees'], 'invalid employee territory range')
+    require(isinstance(icp, dict), 'ICP frontmatter must be an object')
+    territory = icp.get('territory')
+    require(isinstance(territory, dict) and type(territory.get('min_employees')) is int and type(territory.get('max_employees')) is int and 0 < territory['min_employees'] <= territory['max_employees'], 'invalid employee territory range')
+    verticals = icp.get('verticals')
+    require(isinstance(verticals, list), 'ICP verticals must be a list (empty means no ranked preference)')
+    vertical_ids = []
+    for entry in verticals:
+        require(isinstance(entry, dict) and text(entry.get('id')), 'vertical id required')
+        require(type(entry.get('rank')) is int and entry['rank'] > 0, 'vertical rank must be a positive integer')
+        vertical_ids.append(entry['id'])
+    require(len(vertical_ids) == len(set(vertical_ids)), 'duplicate vertical ids')
+    disqualifiers = icp.get('disqualifiers')
+    require(isinstance(disqualifiers, dict), 'ICP disqualifiers must be an object')
+    disqualifier_ids = []
+    for category in ('hard', 'recoverable'):
+        entries = disqualifiers.get(category)
+        require(isinstance(entries, list) and all(text(v) for v in entries), 'disqualifiers.' + category + ' must be a list of nonblank ids')
+        disqualifier_ids.extend(entries)
+    require(len(disqualifier_ids) == len(set(disqualifier_ids)), 'duplicate or conflicting disqualifier ids')
     taxonomy = common.load_taxonomy(folder)
+    require(isinstance(taxonomy, dict) and isinstance(taxonomy.get('tiers'), dict) and set(taxonomy['tiers']) == {'tier1','tier2','tier3'}, 'signal tiers must include exactly tier1, tier2 and tier3')
     ids = []
     for tier, entries in taxonomy['tiers'].items():
-        require(tier in ('tier1','tier2','tier3') and isinstance(entries,list), 'invalid signal tier')
+        require(isinstance(entries, list), 'invalid signal tier')
         for entry in entries:
-            require(text(entry.get('id')), 'signal id required')
+            require(isinstance(entry, dict) and text(entry.get('id')), 'signal id required')
             ids.append(entry['id'])
-            if tier != 'tier3':
+            if tier != 'tier3' or 'freshness_days' in entry:
                 require(type(entry.get('freshness_days')) is int and entry['freshness_days'] > 0, 'signal freshness must be positive')
+            if 'source' in entry:
+                require(text(entry['source']), 'signal source must be a nonblank reference')
     require(len(ids) == len(set(ids)), 'duplicate signal ids')
-    admission = taxonomy['admission']
-    require(all(type(admission[k]) is int and admission[k] > 0 for k in ('tier1_min','tier2_min','warehouse_max_counted')), 'invalid signal admission counts')
-    require(type(admission['warehouse_needs_web_tier2']) is bool, 'warehouse pairing flag must be boolean')
+    admission = taxonomy.get('admission')
+    require(isinstance(admission, dict) and all(type(admission.get(k)) is int and admission[k] > 0 for k in ('tier1_min','tier2_min','warehouse_max_counted')), 'invalid signal admission counts')
+    require(type(admission.get('warehouse_needs_web_tier2')) is bool, 'warehouse pairing flag must be boolean')
+    if p['prospector']['adoption_source']['enabled']:
+        entry, tier = common.taxonomy_entry(taxonomy, p['prospector']['adoption_source']['signal_type'])
+        require(entry and tier == 'tier2' and entry.get('source'), 'adoption signal_type must name a counted warehouse signal')
+    providers = yaml.safe_load((folder / 'providers.yaml').read_text())
+    require(providers.get('schema_version') == 1, 'unsupported provider schema')
+    expected = yaml.safe_load((sc.ROOT / 'examples/config/providers.yaml').read_text())['capabilities']
+    require(set(providers.get('capabilities',{})) == set(expected), 'provider capability catalog differs from the contract')
+    for name, cap in providers['capabilities'].items():
+        require(isinstance(cap,dict) and set(cap) == set(expected[name]), 'invalid provider mapping: ' + name)
+        if cap['tool'] is not None:
+            require(all(text(v) for v in cap.values()), 'incomplete provider mapping: ' + name)
+        else:
+            require(all(v is None for v in cap.values()), 'unavailable capability must be entirely null: ' + name)
+    provider_map.validate_catalog(providers)
+    enabled = p['user_scan']['enabled'] or p['arr_growth']['enabled'] or p['prospector']['adoption_source']['enabled']
+    require(not enabled or p['warehouse']['enabled'], 'adoption and ARR modules require an enabled warehouse')
+    if p['warehouse']['enabled']:
+        require(text(p['warehouse']['name']), 'warehouse name required')
+    return p
+
+
+def validate_module_copy(p, workflow=None):
+    sections = []
+    if p['user_scan']['enabled'] and workflow in (None, 'signal-user-scan'):
+        sections.append(p['user_scan']['statements'])
+    if p['arr_growth']['enabled'] and workflow in (None, 'signal-arr-growth'):
+        sections.append(p['arr_growth']['draft'])
+    for section in sections:
+        for value in section.values():
+            require(not re.search(r'example (?:offer|company)|^\s*Seller\s*$', value, re.I | re.M), 'replace fictional copy in enabled optional modules')
+    return templates.module_previews(p, workflow)
+
+
+def validate_messaging(folder, root, p, today=None):
     track = common.load_talk_track(folder)
     require(date.fromisoformat(str(track['meta']['review_by'])) >= (today or common.policy_today(p)), 'talk track is past its review date')
     require(track['meta']['verify_before_action'] is True, 'retain verification of volatile capability claims')
@@ -117,32 +183,31 @@ def validate(folder, root=sc.ROOT, today=None):
     contradiction = sources.get('contradictions_path')
     if contradiction:
         require(contradiction in blobs, 'contradiction register must be watched')
-    providers = yaml.safe_load((folder / 'providers.yaml').read_text())
-    require(providers.get('schema_version') == 1, 'unsupported provider schema')
-    expected = yaml.safe_load((sc.ROOT / 'examples/config/providers.yaml').read_text())['capabilities']
-    require(set(providers.get('capabilities',{})) == set(expected), 'provider capability catalog differs from the contract')
-    for name, cap in providers['capabilities'].items():
-        require(isinstance(cap,dict) and set(cap) == set(expected[name]), 'invalid provider mapping: ' + name)
-        if cap['tool'] is not None:
-            require(all(text(v) for v in cap.values()), 'incomplete provider mapping: ' + name)
-        else:
-            require(all(v is None for v in cap.values()), 'unavailable capability must be entirely null: ' + name)
-    provider_map.validate_catalog(providers)
-    enabled = p['user_scan']['enabled'] or p['arr_growth']['enabled'] or p['prospector']['adoption_source']['enabled']
-    require(not enabled or p['warehouse']['enabled'], 'adoption and ARR modules require an enabled warehouse')
-    if p['warehouse']['enabled']:
-        require(text(p['warehouse']['name']), 'warehouse name required')
+    return sources, claims
+
+
+def validate_queries(p, root, workflow=None):
+    """Setup checks all enabled queries; runtime checks the selected workflow only."""
     required_queries = []
-    if p['user_scan']['enabled']: required_queries.append('adoption_lookup')
-    if p['prospector']['adoption_source']['enabled']: required_queries.append('adoption_territory')
-    if p['arr_growth']['enabled']: required_queries.append('arr_growth_source')
+    if p['user_scan']['enabled'] and workflow in (None, 'signal-user-scan'): required_queries.append('adoption_lookup')
+    if p['prospector']['adoption_source']['enabled'] and workflow in (None, 'signal-prospector'): required_queries.append('adoption_territory')
+    if p['arr_growth']['enabled'] and workflow in (None, 'signal-arr-growth'): required_queries.append('arr_growth_source')
     for name in required_queries:
         query = p['warehouse']['queries'][name]
         require(text(query.get('path')) and query['path'].startswith('.local/queries/'), 'query must be a reviewed private copy')
         path = sc.relative_path(root, query['path'])
         require(path.is_file() and sc.digest(path) == query.get('sha256'), 'query hash mismatch: ' + name)
         require('prospect_source.' not in path.read_text(), 'map the fictional SQL interface before enabling it')
-    return {'status':'valid_configuration_not_approval', 'files':sc.hashes(folder), 'source_revision':sources['revision'], 'claims_checked':len(claims)}
+
+
+def validate(folder, root=sc.ROOT, today=None):
+    folder, root = Path(folder), Path(root)
+    files = sc.hashes(folder)
+    p = validate_structure(folder)
+    sources, claims = validate_messaging(folder, root, p, today)
+    validate_queries(p, root)
+    previews = validate_module_copy(p)
+    return {'status':'valid_configuration_not_approval', 'files':files, 'source_revision':sources['revision'], 'claims_checked':len(claims), 'module_previews':previews}
 
 
 def main():

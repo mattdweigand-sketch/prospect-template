@@ -8,7 +8,7 @@
 | Machine settings | `../../.local/config/icp.md` | Territory metadata read by the gate; the agent need not load the body |
 | Tool | `arr_growth_source.sql`; `arr_growth_gate.py` | Read-only source query, eligibility checks and exact template draft |
 | Tool | `../../_shared/scripts/route_candidate.py`; `../../_shared/scripts/readback_check.py` | Ownership routing and approved-field readback |
-| Working | warehouse rows; completed CRM and email provider reads | Current account, contact, territory and suppression evidence |
+| Working | USD-normalized warehouse rows with explicit currency; completed CRM and email provider reads | Current account, contact, territory and suppression evidence |
 
 ## Process
 

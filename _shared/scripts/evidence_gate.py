@@ -4,7 +4,7 @@
 Caller: signal-scan and signal-prospector (one run per selected source).
 
     python3 _shared/scripts/evidence_gate.py --receipt receipt.json --page page.txt \
-        [--shared _shared] [--now 2026-09-21T14:00:00-07:00]
+        [--shared .local/config] [--now 2026-09-21T14:00:00-07:00]
 
 receipt.json
     {"account_name": str, "account_aliases": [str], "account_domain": str|null,
@@ -42,6 +42,8 @@ carry an offset. checked_at is that instant in identity.timezone and checked_on 
 
 Exit 0 qualified, bundle JSON on stdout. Exit 1 no_usable_signal (never proof of absence).
 Exit 2 unusable input, {"outcome": "unusable", "reason": ...}. Always JSON on stdout, never a traceback.
+
+--shared defaults to .local/config (or PROSPECT_CONFIG_DIR); use a separate fixture directory only for tests.
 """
 import argparse
 import json

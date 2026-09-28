@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import yaml
 import setup_common as sc
-from validate_setup import validate, require
+from validate_setup import validate_structure, validate_messaging, validate_queries, validate_module_copy, require
 
 CAPABILITIES = {
  'signal-scan': ['web.search','web.fetch','crm.query'],
@@ -20,13 +20,18 @@ CAPABILITIES = {
 
 def check(workflow, root=sc.ROOT):
     config = sc.relative_path(root, '.local/config')
-    result = validate(config,root)
+    files = sc.hashes(config)
     receipt = sc.read(sc.relative_path(config,'approval.json'))
     require(receipt.get('schema_version') == 1 and receipt.get('approval_reference'), 'configuration needs an application receipt')
-    require(result['files'] == receipt.get('files'), 'active configuration changed after approval; run setup or refresh')
-    policy = yaml.safe_load((config / 'policy.yaml').read_text())
+    require(files == receipt.get('files'), 'active configuration changed after approval; run setup or refresh')
+    policy = validate_structure(config)
     module = {'signal-user-scan':'user_scan', 'signal-arr-growth':'arr_growth'}.get(workflow)
     require(not module or policy[module]['enabled'], 'optional workflow is disabled; configure it through setup')
+    if workflow == 'signal-outreach':
+        validate_messaging(config, root, policy)
+    validate_queries(policy, root, workflow)
+    if workflow in ('signal-user-scan', 'signal-arr-growth'):
+        validate_module_copy(policy, workflow)
     caps = yaml.safe_load((config / 'providers.yaml').read_text())['capabilities']
     required = list(CAPABILITIES[workflow])
     if workflow == 'signal-prospector' and policy['prospector']['adoption_source']['enabled']:

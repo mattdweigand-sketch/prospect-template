@@ -7,6 +7,8 @@
 -- Returns organization-level figures and the permitted billing email only. Never add user ids, user emails, names, seat counts, or per-user rows.
 -- An org needs window_days + 1 daily snapshots, one row per day, each with an ARR value. A missing or duplicated day drops the org from the
 -- result. Nothing is zero-filled. Dropped orgs are not reported, so zero rows is a finding, never proof that nothing grew.
+-- annual_recurring_revenue must already be normalized to USD under the reviewed FX/date/calculation mapping.
+-- currency must be USD on every daily row; no conversion occurs here. Any other or missing currency drops the org.
 WITH p AS (
   SELECT TO_DATE(?) AS through_date, ? AS window_days
 ), win AS (
@@ -33,6 +35,7 @@ WITH p AS (
          MAX(s.organization_name) AS organization_name,
          MAX(s.subscription_platform) AS subscription_platform,
          COUNT(*) AS row_count,
+         SUM(CASE WHEN s.currency = 'USD' THEN 0 ELSE 1 END) AS bad_currency_rows,
          ROUND(MAX(s.annual_recurring_revenue), 2) AS arr_usd
   FROM prospect_source.organization_subscription_daily s
   JOIN orgs o ON o.organization_uuid = s.organization_uuid
@@ -47,7 +50,7 @@ WITH p AS (
          MAX(CASE WHEN d.snapshot_date = win.baseline_date THEN d.arr_usd END) AS baseline_arr_usd,
          MAX(CASE WHEN d.snapshot_date = win.through_date THEN d.arr_usd END) AS current_arr_usd,
          COUNT(*) AS observed_dates,
-         SUM(CASE WHEN d.row_count > 1 OR d.arr_usd IS NULL THEN 1 ELSE 0 END) AS bad_dates,
+         SUM(CASE WHEN d.row_count > 1 OR d.arr_usd IS NULL OR d.bad_currency_rows > 0 THEN 1 ELSE 0 END) AS bad_dates,
          MAX(win.window_days) + 1 AS required_dates
   FROM daily d CROSS JOIN win
   GROUP BY d.organization_uuid
@@ -56,6 +59,7 @@ SELECT t.organization_uuid,
        t.organization_name,
        i.crm_account_id,
        TO_CHAR(win.through_date, 'YYYY-MM-DD') AS data_through_date,
+       'USD' AS currency,
        t.baseline_arr_usd,
        t.current_arr_usd,
        ROUND(t.current_arr_usd - t.baseline_arr_usd, 2) AS net_change_usd,

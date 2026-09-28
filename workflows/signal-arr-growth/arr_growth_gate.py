@@ -14,7 +14,7 @@ packet.json
       "rows": [                                   # rows from arr_growth_source.sql, in the order returned, each joined to live CRM reads
         {
           "organization_uuid": "...", "organization_name": "...", "crm_account_id": "account-123",
-          "baseline_arr_usd": 1200.0, "current_arr_usd": 2400.0, "net_change_usd": 1200.0,
+          "currency": "USD", "baseline_arr_usd": 1200.0, "current_arr_usd": 2400.0, "net_change_usd": 1200.0,
           "observed_dates": 31, "required_dates": 31,
           "subscription_platform": "web", "billing_email": "x@acme.example", "communications_enabled": true,
           "account": {"exists": true, "name": "Acme", "website": "https://acme.example", "owner_id": "owner-123", "owner_is_active": true,
@@ -29,7 +29,7 @@ packet.json
 
 Per row, in order. The first failure names the hold.
     1. data: data_through_date is yesterday in identity.timezone. Coverage is window_days + 1;
-       ARR amounts are finite and nonnegative (malformed amounts are exit 2), and positive net change agrees
+       Currency is explicitly USD, normalized upstream; ARR amounts are finite and nonnegative (malformed amounts are exit 2), and positive net change agrees
        with current minus baseline
     2. route: Account exists and routes `scan` (identity.crm_user_id owns it, no open deal). Other routes are reported as the hold
     3. territory: headcount inside icp.md frontmatter. Unknown holds. A completed headcount lookup is
@@ -61,10 +61,11 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_shared" / "scripts"))
 import common  # noqa: E402
+from policy_templates import build_draft, forbidden  # noqa: E402
 from route_candidate import load_rules, route, territory  # noqa: E402
 
 SHARED = common.SHARED
-ROW_KEYS = {"organization_uuid", "organization_name", "crm_account_id", "baseline_arr_usd", "current_arr_usd",
+ROW_KEYS = {"currency", "organization_uuid", "organization_name", "crm_account_id", "baseline_arr_usd", "current_arr_usd",
             "net_change_usd", "observed_dates", "required_dates", "subscription_platform", "billing_email",
             "communications_enabled", "account", "contacts", "last_touch_date", "reads"}
 
@@ -120,11 +121,6 @@ def queries(packet, policy, today=None):
     return {"cutoff_date": cutoff.isoformat(), "queries": out}
 
 
-def forbidden(pol):
-    """arr_growth.draft_forbidden_pattern compiled once per run. Case-insensitive so 'arr' and 'ARR' both match."""
-    return re.compile(pol["draft_forbidden_pattern"], re.I)
-
-
 def valid_amount(value):
     try:
         return type(value) in (int, float) and math.isfinite(value) and value >= 0
@@ -133,6 +129,8 @@ def valid_amount(value):
 
 
 def hold_reason(r, rules, pol, today):
+    if r["currency"] != "USD":
+        raise ValueError("ARR currency must be USD, normalized upstream before this workflow")
     amounts = [r[k] for k in ("baseline_arr_usd", "current_arr_usd", "net_change_usd")]
     if not all(valid_amount(v) for v in amounts):
         raise ValueError("ARR amounts must be finite, nonnegative numbers")
@@ -190,20 +188,6 @@ def hold_reason(r, rules, pol, today):
     return None
 
 
-def build_draft(r, pol, forbid):
-    d = pol["draft"]
-    first = r["contacts"][0].get("first_name") if r["contacts"] else None
-    if isinstance(first, str) and first.strip().lower() == "null":
-        first = None
-    greeting = d["greeting_person"].format(first_name=first.strip()) if first and first.strip() \
-        else d["greeting_team"].format(account_name=r["account"]["name"])
-    body = d["body"].rstrip("\n")
-    hit = forbid.search(d["subject"]) or forbid.search(body)
-    if hit:
-        raise ValueError(f"draft template contains a forbidden token {hit.group(0)!r}. Fix arr_growth.draft in policy.yaml")
-    return {"to": r["billing_email"], "subject": d["subject"], "body": f"{greeting}\n\n{body}"}
-
-
 def check(packet, policy, today=None, shared=SHARED):
     pol = policy["arr_growth"]
     rules = load_rules(shared)
@@ -224,7 +208,7 @@ def check(packet, policy, today=None, shared=SHARED):
             raise ValueError(f"row {i} needs a nonempty crm_account_id")
         reason = hold_reason(r, rules, pol, today)
         entry = {"rank": i, "account_id": r["crm_account_id"], "account_name": r["account"].get("name") or r["organization_name"],
-                 "net_change_usd": r["net_change_usd"], "baseline_arr_usd": r["baseline_arr_usd"], "current_arr_usd": r["current_arr_usd"]}
+                 "currency": r["currency"], "net_change_usd": r["net_change_usd"], "baseline_arr_usd": r["baseline_arr_usd"], "current_arr_usd": r["current_arr_usd"]}
         if reason:
             held.append({**entry, "hold": reason})
         elif r["crm_account_id"] in selected_accounts:

@@ -17,7 +17,7 @@ python3 scripts/validate_setup.py --config .local/setup/initial-setup/proposal
 python3 scripts/setup.py prepare initial-setup
 ```
 
-The result is a full `review.md` containing diffs, complete proposed files and previews. Review business meaning, source sufficiency, naming/disclosure permission, voice and operating values. `deployment.review_reference` records that meaning review; it is not approval to apply. Prepare also binds active preimages, proposed bytes, source revision and preview bytes. Present the exact review and its SHA to the user.
+The result is a full `review.md` containing diffs, complete proposed files and previews. For enabled optional modules, it also renders the exact ARR draft with both person and team greetings and includes the adoption statements. Replace all fictional optional-module wording before enabling it; disabled modules may retain scaffolding. Review those samples alongside business meaning, source sufficiency, naming/disclosure permission, voice and operating values. `deployment.review_reference` records that meaning review; it is not approval to apply. Prepare also binds active preimages, proposed bytes, source revision and preview bytes. Present the exact review and its SHA to the user.
 
 After the user's approval of that exact review:
 
@@ -26,6 +26,12 @@ python3 scripts/setup.py apply initial-setup --approval-reference '<actual chat 
 ```
 
 The command revalidates, checks hashes and expected active preimages, stages the full configuration, applies under an exclusive lock, verifies readback and writes a receipt. An existing configuration is retained at the run's `previous-config/`. Changed proposals or current files require a new prepare and approval. A fabricated reference does not create authorization.
+
+## Configuration contracts
+
+ICP frontmatter requires the employee range, a `verticals` list of unique nonblank IDs with positive integer ranks, and `disqualifiers.hard` / `disqualifiers.recoverable` lists of distinct IDs. Empty lists mean no preference or exclusion in that category. Signals require `tier1`, `tier2` and `tier3` lists, unique IDs, positive freshness days for counted tiers, and a nonblank source reference on warehouse signals. An enabled adoption-discovery signal must name a tier2 warehouse entry.
+
+Follow-up task subjects accept `{email_subject}`. Descriptions accept `{message_id}`, `{thread_id}`, `{signal_type}`, `{angle}` and the legacy alias `{unit}` for the same historical angle. ARR person greetings accept `{first_name}` and team greetings accept `{account_name}`; its subject and body are fixed text with no fields. Templates accept bare named fields only, without format specifiers, conversions or attribute access. Use doubled braces for literal braces in rendered templates. Setup renders representative values with the same helpers as the workflows and rejects unsupported fields.
 
 ## Source modes
 
@@ -39,9 +45,9 @@ Complete `providers.yaml` from current tool discovery and real tool schemas. Con
 python3 scripts/preflight.py signal-scan
 ```
 
-This checks active approval hashes, current source/configuration validity, module selection, and declared capabilities. Then verify actual tool availability and complete authorized live reads. No endpoint, token, scope or capability is inferred from a checked-in mapping. Put credentials in the provider's normal connection mechanism, never a repository file. An optional project `.codex/config.toml` is only added after a real MCP setup is known; this template does not invent one.
+This checks all seven active approval hashes and configuration structure, then the selected workflow's dependencies. New signal outreach checks the current talk-track review date and pinned messaging/voice evidence. Historical follow-up and public research do not require current talk-track content. ARR uses its reviewed fixed copy. Query hashes are checked only for the selected enabled warehouse branch; an unavailable ARR query does not block public scanning. Setup preparation and application still validate all messaging evidence and every enabled query. Preflight also checks module selection and declared capabilities. Then verify actual tool availability and complete authorized live reads. No endpoint, token, scope or capability is inferred from a checked-in mapping. Put credentials in the provider's normal connection mechanism, never a repository file. An optional project `.codex/config.toml` is only added after a real MCP setup is known; this template does not invent one.
 
-The three SQL files are fictional interface examples, not deployed schema. Read `setup/subscription-interface.md` for the public view contract and business-model requirements. For each enabled warehouse branch, create a reviewed private `.local/queries/` copy, map actual tables/columns and semantics, record its SHA in policy, verify parameter binding and allowed result fields, and perform authorized read-only compatibility checks. A schema name replacement alone is insufficient. Data dates follow the configured identity time zone; the source must use the same daily boundary.
+The three SQL files are fictional interface examples, not deployed schema. Read `setup/subscription-interface.md` for the public view contract and business-model requirements. For each enabled warehouse branch, create a reviewed private `.local/queries/` copy, map actual tables/columns and semantics, record its SHA in policy, verify parameter binding and allowed result fields, and perform authorized read-only compatibility checks. A schema name replacement alone is insufficient. Data dates follow the configured identity time zone; the source must use the same daily boundary. Existing ARR private mappings must be reviewed for upstream USD normalization and return the explicit `currency: USD` field. Update the query hash through setup and approve the revised review before using that mapping. Packets without the field are rejected.
 
 ## Refresh and recovery
 

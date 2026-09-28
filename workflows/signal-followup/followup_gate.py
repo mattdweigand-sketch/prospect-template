@@ -41,6 +41,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "_shared" / "scripts"))
+from policy_templates import render, followup_description
 import common  # noqa: E402
 
 SHARED = common.SHARED
@@ -114,7 +115,7 @@ def check(packet, mode, policy, today=None, now=None, shared=SHARED):
         if (contact.get("email") or "").lower() != (s.get("to") or "").lower():
             reasons.append("contact email does not equal recipient")
 
-    subject = fp["task"]["subject"].format(email_subject=s.get("subject") or "")
+    subject = render(fp["task"]["subject"], email_subject=s.get("subject") or "")
     prefix = fp["task"]["subject"].split("{")[0].strip()
     tasks = packet.get("tasks")
     if not isinstance(tasks, list):
@@ -154,8 +155,8 @@ def check(packet, mode, policy, today=None, now=None, shared=SHARED):
         "priority": fp["task"]["priority"],
         "subtype": fp["task"]["subtype"],
         "due_date": due.isoformat(),
-        "description": fp["task"]["description"].format(message_id=s["message_id"], thread_id=s.get("thread_id") or "unavailable",
-                                                        signal_type=stype, unit=unit),
+        "description": followup_description(fp["task"]["description"], message_id=s["message_id"], thread_id=s.get("thread_id") or "unavailable",
+                                                        signal_type=stype, angle=unit),
     }
     return {"verdict": "allow", "mode": mode, "task": task}
 

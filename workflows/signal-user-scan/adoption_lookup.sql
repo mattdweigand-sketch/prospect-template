@@ -1,6 +1,6 @@
 -- Fictional interface example: prospect_source views are not installed. Configure a reviewed private query copy before live use.
 -- signal-user-scan. One row of org-level adoption facts for one CRM Account.
--- Bindings, 1-based: ?1 CRM Account Id (18 char), ?2 account email domain (lowercase, no @), ?3 snapshot_date (policy warehouse.data_date, YYYY-MM-DD).
+-- Bindings, 1-based: ?1 configured CRM's opaque Account ID (represented according to the reviewed warehouse mapping), ?2 account email domain (lowercase, no @), ?3 snapshot_date (policy warehouse.data_date, YYYY-MM-DD).
 -- Returns 7 of the 11 policy user_scan.bundle_keys. The skill adds account_name, crm_account_id, account_domain, and derives adoption.
 -- org_service_types and org_platforms are comma-joined strings. Empty string means none, the skill splits to an empty list.
 -- Counts only organizations with is_deleted = FALSE, the same set the booleans read.
