@@ -21,7 +21,7 @@ EXPECTED_WORKFLOWS = {
 
 
 def procedure_files():
-    """Executable procedures only; the blank starter is not a workflow."""
+    """Executable procedures in the workflow folders."""
     return sorted((ROOT / "workflows").glob("*/procedure.md"))
 
 

@@ -43,17 +43,32 @@ CRM and email providers are configurable. Setup maps your available tools, recor
 prospect-template/
 ├── AGENTS.md          # Routes Codex requests
 ├── CONTEXT.md         # Shared workflow rules
-├── .agents/skills/    # Skill commands
-├── workflows/         # Eight workflow procedures
+├── .agents/
+│   └── skills/        # Skill commands
+├── workflows/
+│   ├── prospect-setup/
+│   ├── signal-refresh/
+│   ├── signal-scan/
+│   ├── signal-prospector/
+│   ├── signal-user-scan/
+│   ├── signal-outreach/
+│   ├── signal-followup/
+│   └── signal-arr-growth/
 ├── setup/             # Setup guides
-├── examples/config/   # Starter settings
-├── _shared/           # Shared checks
+├── examples/
+│   └── config/        # Starter settings
+├── _shared/
+│   └── scripts/       # Shared checks
 ├── scripts/           # Setup and maintenance tools
-├── _templates/        # New workflow starters
 ├── tests/             # Automated tests
-├── .github/           # GitHub checks
+├── .github/
+│   └── workflows/     # GitHub checks
 ├── docs/              # Project notes
-└── .local/            # Your local settings and setup files
+└── .local/            # Created during setup; private
+    ├── config/        # Your approved settings
+    ├── setup/         # Proposals and reviews
+    ├── sources/       # Optional source snapshots
+    └── queries/       # Optional warehouse queries
 ```
 
 `.local/` is created as needed and ignored by Git. Start with the [setup guide](setup/installation.md).
