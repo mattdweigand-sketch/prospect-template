@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1090" viewBox="0 0 1120 1090" role="img" aria-labelledby="title description">
+<title id="title">Prospect template: repository architecture</title>
+<desc id="description">Codex entry points in .agents/skills read AGENTS.md and CONTEXT.md, then open one of eight workflows. Setup and refresh, research, and outreach workflows each own a contract and procedure. Workflows read approved settings from .local/config, use shared Python checks and setup tools, and produce findings in chat or approved records and unsent drafts in CRM and email. Local setup artifacts are ignored by Git. Tests and CI verify the code; workflow templates support extension.</desc>
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0L8 4L0 8Z" fill="#64748b"/></marker>
+  <marker id="result" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0L8 4L0 8Z" fill="#0f766e"/></marker>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
+    .path { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
+    .label { font-size: 14px; font-weight: 700; letter-spacing: 1.3px; }
+    .small { font-size: 16px; }
+    .body { font-size: 18px; }
+    .name { font-size: 19px; font-weight: 600; }
+    .edge { fill: none; stroke: #64748b; stroke-width: 2; marker-end: url(#arrow); }
+  </style>
+</defs>
+<rect width="1120" height="1090" rx="18" fill="#f8fafc"/>
+
+<text x="48" y="39" class="label" fill="#0f766e" >PROSPECT TEMPLATE</text>
+<text x="48" y="78" class="body" fill="#0f172a" style="font-size:32px;font-weight:700">How the repository fits together</text>
+<rect x="260" y="112" width="600" height="104" rx="14" fill="#e0e7ff" stroke="#a5b4fc"/>
+<text x="560" y="141" class="label" fill="#3730a3" text-anchor="middle" >START IN CODEX</text>
+<text x="560" y="170" class="name" fill="#1e1b4b" text-anchor="middle" >.agents/skills/  ·  eight small entry points</text>
+<text x="560" y="198" class="small" fill="#3730a3" text-anchor="middle" >AGENTS.md routes requests; CONTEXT.md defines handoffs.</text>
+<path d="M560 216V263" class="edge" />
+<text x="576" y="246" class="small" fill="#475569" >opens</text>
+<rect x="48" y="268" width="1024" height="242" rx="14" fill="#ffffff" stroke="#a5b4fc"/>
+<text x="72" y="301" class="label" fill="#4338ca" >workflows/</text>
+<text x="72" y="329" class="body" fill="#475569" >Each folder owns its CONTEXT.md, procedure.md and any workflow-specific checks.</text>
+<rect x="68" y="352" width="316" height="138" rx="10" fill="#f8faff" stroke="#dbe4ff"/>
+<text x="86" y="379" class="label" fill="#4338ca" >SETUP &amp; REFRESH</text>
+<rect x="402" y="352" width="316" height="138" rx="10" fill="#f8faff" stroke="#dbe4ff"/>
+<text x="420" y="379" class="label" fill="#4338ca" >RESEARCH</text>
+<rect x="736" y="352" width="316" height="138" rx="10" fill="#f8faff" stroke="#dbe4ff"/>
+<text x="754" y="379" class="label" fill="#4338ca" >DRAFTS &amp; FOLLOW-UP</text>
+<text x="86" y="412" class="name" fill="#1e293b" >prospect-setup</text>
+<text x="86" y="441" class="name" fill="#1e293b" >signal-refresh</text>
+<text x="420" y="412" class="name" fill="#1e293b" >signal-prospector</text>
+<text x="420" y="441" class="name" fill="#1e293b" >signal-scan</text>
+<text x="420" y="470" class="small" fill="#334155" >signal-user-scan (optional)</text>
+<text x="754" y="412" class="name" fill="#1e293b" >signal-outreach</text>
+<text x="754" y="441" class="name" fill="#1e293b" >signal-followup</text>
+<text x="754" y="470" class="small" fill="#334155" >signal-arr-growth (optional)</text>
+<path d="M298 510V565" class="edge" />
+<text x="315" y="545" class="small" fill="#475569" >reads</text>
+<path d="M822 510V565" class="edge" />
+<text x="839" y="545" class="small" fill="#475569" >uses</text>
+<path d="M560 510V797" class="" fill="none" stroke="#0f766e" stroke-width="2.5" marker-end="url(#result)"/>
+<rect x="48" y="570" width="496" height="170" rx="14" fill="#fff7ed" stroke="#fdba74"/>
+<text x="70" y="600" class="label" fill="#9a3412" >LOCAL CONFIGURATION</text>
+<text x="70" y="633" class="path name" fill="#7c2d12" >.local/config/</text>
+<text x="70" y="662" class="body" fill="#7c2d12" >Your offer, ICP, signals, voice and providers.</text>
+<text x="70" y="692" class="small" fill="#9a3412" >setup/ + examples/config/ guide configuration.</text>
+<text x="70" y="719" class="small" fill="#9a3412" >Reviews, retained sources and SQL also stay in .local/.</text>
+<rect x="576" y="570" width="496" height="170" rx="14" fill="#ecfdf5" stroke="#6ee7b7"/>
+<text x="598" y="600" class="label" fill="#065f46" >SHARED CODE</text>
+<text x="598" y="633" class="path name" fill="#064e3b" >_shared/scripts/</text>
+<text x="598" y="660" class="small" fill="#065f46" >Evidence, privacy, routing, mappings and readback.</text>
+<text x="598" y="692" class="path name" fill="#064e3b" >scripts/</text>
+<text x="598" y="719" class="small" fill="#065f46" >Setup, refresh, preflight and maintenance tools.</text>
+<text x="48" y="768" class="small" fill="#9a3412" >Ignored by Git; created as needed.</text>
+<text x="578" y="779" class="small" fill="#0f766e" >produces reviewed results</text>
+<rect x="48" y="802" width="1024" height="118" rx="14" fill="#0f172a" stroke="#0f172a"/>
+<text x="72" y="831" class="label" fill="#5eead4" >PROSPECTING RESULTS · OUTSIDE THE REPO</text>
+<text x="72" y="864" class="name" fill="#ffffff" >Chat</text>
+<text x="72" y="891" class="body" fill="#cbd5e1" >Findings, proposals and exact approvals.</text>
+<path d="M548 848V899" stroke="#475569"/>
+<text x="580" y="864" class="name" fill="#ffffff" >CRM + email provider</text>
+<text x="580" y="891" class="body" fill="#cbd5e1" >Approved records + unsent drafts. You send email.</text>
+<rect x="48" y="952" width="1024" height="103" rx="14" fill="#f1f5f9" stroke="#cbd5e1"/>
+<text x="70" y="980" class="label" fill="#475569" >VERIFY THE CODE</text>
+<text x="70" y="1010" class="path small" fill="#334155" >tests/ + .github/workflows/checks.yml</text>
+<text x="70" y="1037" class="small" fill="#475569" >Synthetic checks and CI validate repository behavior.</text>
+<text x="598" y="980" class="label" fill="#475569" >EXTEND OR INSPECT</text>
+<text x="598" y="1010" class="path small" fill="#334155" >_templates/workflow/</text>
+<text x="598" y="1037" class="small" fill="#475569" >docs/BUILD-REPORT.md records scope and verification.</text>
+</svg>
