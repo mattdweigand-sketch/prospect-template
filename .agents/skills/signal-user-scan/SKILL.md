@@ -1,6 +1,6 @@
 ---
 name: signal-user-scan
-description: Check organization-level configured-product adoption for a named Salesforce account in the Prospect repository using permitted warehouse data.
+description: Check organization-level configured-product adoption for a named CRM account in the Prospect repository using permitted warehouse data.
 ---
 
 # Signal user scan

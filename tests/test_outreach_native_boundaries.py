@@ -37,7 +37,7 @@ class NativeBoundaries(unittest.TestCase):
         self.assertTrue(any('scope differs' in r for r in self.check(p)))
 
     def test_short_activity_window_blocks(self):
-        p=copy.deepcopy(PACKET); p['reads']['gmail_sent']['window_start']='2026-09-01'
+        p=copy.deepcopy(PACKET); p['reads']['email_sent']['window_start']='2026-09-01'
         self.assertTrue(self.check(p))
 
     def test_read_call_reference_required(self):
@@ -49,12 +49,12 @@ class NativeBoundaries(unittest.TestCase):
         self.assertTrue(any('unmapped Task status' in r for r in self.check(p)))
 
     def test_configured_completed_status_suppresses(self):
-        p=copy.deepcopy(PACKET); p['activity']=[{'kind':'task','date':NOW.date().isoformat(),'who':'003JANE','status':'Done','subtype':'Email'}]
+        p=copy.deepcopy(PACKET); p['activity']=[{'kind':'task','date':NOW.date().isoformat(),'who':'003JANE','who_kind':'contact_id','status':'Done','subtype':'Email'}]
         policy=copy.deepcopy(POL); policy['task_status_map']['Done']='completed'
         self.assertTrue(any('suppressed' in r for r in self.check(p,policy)))
 
-    def test_ownership_opportunity_and_domain_changes_block(self):
-        for key,value in (('owner_id','005OTHER'),('owner_is_active',False),('open_opportunity_ids',['006OPEN']),('domain','another.com')):
+    def test_ownership_deal_and_domain_changes_block(self):
+        for key,value in (('owner_id','005OTHER'),('owner_is_active',False),('open_deal_ids',['006OPEN']),('domain','another.com')):
             p=copy.deepcopy(PACKET); p['account'][key]=value
             with self.subTest(key=key): self.assertTrue(self.check(p))
 

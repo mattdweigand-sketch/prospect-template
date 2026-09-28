@@ -27,25 +27,25 @@ NOW = datetime(2026, 9, 22, 14, 0, tzinfo=PT)
 
 
 # Concise buyer-facing excerpts used in otherwise valid packet fixtures.
-MESSAGE_LINE = "Example Research combines models from different providers with web research and company context."
+MESSAGE_LINE = "Example Offer helps teams plan and deliver reviewed operational projects."
 
 
 PACKET = {
-    "bundle": {"account_name": "Acme", "account_domain": "acme.example", "signal_type": "ai_exec_appointment", "vertical": None,
+    "bundle": {"account_name": "Acme", "account_domain": "acme.example", "signal_type": "relevant_leader_appointment", "vertical": None,
                "published_date": "2026-09-10", "checked_on": "2026-09-22", "checked_at": "2026-09-22T13:30:00-07:00",
-               "classification": "active_initiative", "relevance": "employee_use",
+               "classification": "active_initiative", "relevance": "relevant_to_offer", "fit_reason": "The evidenced initiative matches the configured offer and its stated limits.",
                "gate":"evidence_gate", "source_url":"https://acme.example/news", "date_basis":"published",
-               "quote": "Acme has appointed Jane Doe as Chief AI Officer to lead enterprise AI."},
-    "talk_track": {"angle": "Model flexibility", "persona": "ai_owner",
-                   "pick_reason": "The new AI lead owns rollout decisions, making model flexibility across teams relevant."},
-    "recipient": {"email": "jane.doe@acme.example", "name": "Jane Doe", "source": "existing Salesforce Contact with Email",
-                  "title": "Chief AI Officer", "title_override": None, "contact_id": "003JANE"},
-    "account": {"id":"001ACME", "domain":"acme.example", "owner_id":POLICY["identity"]["sfdc_user_id"], "owner_is_active":True, "open_opportunity_ids":[]},
-    "reads": {name:{"complete":True,"query_reference":"synthetic:"+name,"checked_at":"2026-09-22T13:30:00-07:00","account_domain":"acme.example","recipient_email":"jane.doe@acme.example","window_start":"2026-08-23"} for name in ("tasks","events","gmail_sent")},
+               "quote": "Acme has appointed Jane Doe as Chief Operating Officer to lead operations improvement."},
+    "talk_track": {"angle": "Implementation support", "persona": "initiative_owner",
+                   "pick_reason": "The new operations lead owns rollout decisions, making implementation support across teams relevant."},
+    "recipient": {"email": "jane.doe@acme.example", "name": "Jane Doe", "source": "existing CRM contact with email",
+                  "title": "Chief Operating Officer", "title_override": None, "contact_id": "003JANE"},
+    "account": {"id":"001ACME", "domain":"acme.example", "owner_id":POLICY["identity"]["crm_user_id"], "owner_is_active":True, "open_deal_ids":[]},
+    "reads": {name:{"complete":True,"query_reference":"synthetic:"+name,"checked_at":"2026-09-22T13:30:00-07:00","account_domain":"acme.example","recipient_email":"jane.doe@acme.example","window_start":"2026-08-23"} for name in ("tasks","events","email_sent")},
     "activity": [{"kind": "task", "subtype": "Email", "date": "2026-06-01", "status": "Completed", "subject": "old email"},
                  {"kind": "task", "subtype": "Task", "date": "2026-09-17", "status": "Completed", "subject": "LinkedIn - Connected"}],
-    "draft": {"subject": "Chief AI Officer, first quarter",
-              "body": "You named Jane Doe Chief AI Officer last week.\n\nThat usually creates a tooling review. "
+    "draft": {"subject": "Chief Operating Officer, first quarter",
+              "body": "You named Jane Doe Chief Operating Officer last week.\n\nThat usually creates a tooling review. "
                       + MESSAGE_LINE + "\n\nWorth a 20 minute call?"},
 }
 
@@ -63,7 +63,7 @@ def pk(**changes):
 def angle_packet(angle, signal_type, persona, title):
     return pk(bundle__signal_type=signal_type, talk_track__angle=angle,
               talk_track__persona=persona, recipient__title=title,
-              draft__body="You named Jane Doe Chief AI Officer.\n\n" + MESSAGE_LINE + "\n\nWorth a call?")
+              draft__body="You named Jane Doe Chief Operating Officer.\n\n" + MESSAGE_LINE + "\n\nWorth a call?")
 
 
 def shared_copy(mutate):
@@ -101,7 +101,7 @@ class OutreachGateTests(unittest.TestCase):
 
     # check 1
     def test_unknown_signal_type_blocks(self):
-        self.assertBlocks(pk(bundle__signal_type="generic_ai_marketing"), "bundle signal_type not a tier1 or tier2")
+        self.assertBlocks(pk(bundle__signal_type="generic_marketing"), "bundle signal_type not a tier1 or tier2")
 
     # check 2
     def test_any_web_date_basis_passes(self):
@@ -109,13 +109,13 @@ class OutreachGateTests(unittest.TestCase):
             self.assertEqual(self.check(pk(bundle__date_basis=basis, bundle__gate="evidence_gate")), [], basis)
 
     def test_published_date_freshness_is_per_signal_type(self):
-        self.assertEqual(self.check(pk(bundle__published_date="2026-06-24")), [])  # 90 days, ai_exec_appointment allows 90
-        self.assertBlocks(pk(bundle__published_date="2026-06-23"), "91 days old, ai_exec_appointment freshness is 90 days")
-        p = angle_packet("Workflow cost", "public_ai_initiative", "economic_buyer", "COO")
+        self.assertEqual(self.check(pk(bundle__published_date="2026-06-24")), [])  # 90 days, relevant_leader_appointment allows 90
+        self.assertBlocks(pk(bundle__published_date="2026-06-23"), "91 days old, relevant_leader_appointment freshness is 90 days")
+        p = angle_packet("Workflow cost", "announced_initiative", "economic_buyer", "COO")
         p["bundle"]["published_date"] = "2026-07-24"  # 60 days
         self.assertEqual(self.check(p), [])
         p["bundle"]["published_date"] = "2026-07-23"  # 61 days
-        self.assertBlocks(p, "61 days old, public_ai_initiative freshness is 60 days")
+        self.assertBlocks(p, "61 days old, announced_initiative freshness is 60 days")
 
     # check 3
     def test_checked_at_elapsed_boundary(self):
@@ -160,7 +160,7 @@ class OutreachGateTests(unittest.TestCase):
         self.assertBlocks(pk(talk_track__pick_reason=None), "talk_track.pick_reason must be a nonempty")
 
     def test_plain_language_judgment_and_unlisted_title_allow(self):
-        p = pk(recipient__title="AI Adoption Program Lead", talk_track__persona="Owns delivery of the AI pilot",
+        p = pk(recipient__title="Implementation Program Lead", talk_track__persona="Owns delivery of the implementation project",
                talk_track__angle="A common platform across teams")
         self.assertEqual(self.check(p), [])
 
@@ -172,8 +172,8 @@ class OutreachGateTests(unittest.TestCase):
     def test_discovery_and_legacy_bundles_do_not_enter_outreach(self):
         for value in (None, "early_indication", "general_mention"):
             self.assertBlocks(pk(bundle__classification=value), "active_initiative")
-        for value in (None, "customer_product", "unclear"):
-            self.assertBlocks(pk(bundle__relevance=value), "employee_use")
+        for value in (None, "outside_offer", "unclear"):
+            self.assertBlocks(pk(bundle__relevance=value), "relevant_to_offer")
 
     # check 5
     def test_review_by_in_the_past_blocks(self):
@@ -213,7 +213,7 @@ class OutreachGateTests(unittest.TestCase):
 
 
     def test_recipient_domain_mismatch_blocks_and_subdomain_allows(self):
-        self.assertIn("recipient domain does not match bundle account_domain", self.check(pk(recipient__email="jane@gmail.com")))
+        self.assertIn("recipient domain does not match bundle account_domain", self.check(pk(recipient__email="jane@email.com")))
         self.assertEqual(self.check(pk(recipient__email="jane@corp.acme.example")), [])
 
     def test_unverified_recipient_source_blocks(self):
@@ -225,7 +225,7 @@ class OutreachGateTests(unittest.TestCase):
         p["recipient"]["email"] = "jane@other.example"
         self.assertBlocks(p, "recipient domain does not match")
 
-    def test_salesforce_recipient_requires_contact_id(self):
+    def test_crm_recipient_requires_contact_id(self):
         for value in (None, "", "  ", False, 12):
             self.assertBlocks(pk(recipient__contact_id=value), "needs a nonempty contact_id")
         p = pk()
@@ -246,21 +246,21 @@ class OutreachGateTests(unittest.TestCase):
                  ({"kind": "task", "subtype": "Call", "date": "2026-09-05", "status": "Not Started", "subject": "Call"}, False),
                  ({"kind": "task", "subtype": "Call", "date": "2026-09-12", "status": "Completed", "subject": "Call"}, True),
                  ({"kind": "event", "subtype": None, "date": "2026-09-12", "status": None, "subject": "Meeting"}, True),
-                 ({"kind": "gmail_sent", "date": "2026-09-15", "status": None, "subject": "Hello"}, True)]
+                 ({"kind": "email_sent", "date": "2026-09-15", "status": None, "subject": "Hello"}, True)]
         for a, suppressed in cases:
             p = pk(); p["activity"].append(a)
             self.assertEqual(any(x.startswith("suppressed") for x in self.check(p)), suppressed, a)
 
     def test_suppression_is_per_contact(self):
         row = {"kind": "task", "subtype": "Email", "date": "2026-09-15", "status": "Completed", "subject": "Email: intro"}
-        other = dict(row, who="003OTHERPERSON")
-        same_id = dict(row, who="003JANE")
-        same_email = dict(row, who="Jane.Doe@acme.example")
+        other = dict(row, who="003OTHERPERSON", who_kind="contact_id")
+        same_id = dict(row, who="003JANE", who_kind="contact_id")
+        same_email = dict(row, who="Jane.Doe@acme.example", who_kind="email")
         unknown = dict(row, who=None)
         for a, suppressed in ((other, False), (same_id, True), (same_email, True), (unknown, True)):
             p = pk(); p["recipient"]["contact_id"] = "003JANE"; p["activity"].append(a)
             self.assertEqual(any(x.startswith("suppressed") for x in self.check(p)), suppressed, a)
-        p = pk(); p["activity"].append(dict(row, kind="gmail_sent", subtype=None, who="someone.else@acme.example"))
+        p = pk(); p["activity"].append(dict(row, kind="email_sent", subtype=None, who="someone.else@acme.example", who_kind="email"))
         self.assertFalse(any(x.startswith("suppressed") for x in self.check(p)))
 
     def test_empty_targets_are_unknown_and_suppress(self):
@@ -289,7 +289,7 @@ class OutreachGateTests(unittest.TestCase):
 
     def test_approved_q7_sentence_is_not_rejected_as_evidence_overlap(self):
         p = pk(talk_track__angle="Research infrastructure",
-               draft__body="Example Research does not train its own frontier models.\n\nWorth a call?")
+               draft__body="Example Offer does not make purchasing decisions on the buyer's behalf.\n\nWorth a call?")
         self.assertEqual(self.check(p), [])
 
     def test_style_and_lexical_similarity_are_not_hard_gates(self):
@@ -299,34 +299,34 @@ class OutreachGateTests(unittest.TestCase):
 
     # check 8
     def test_number_from_quote_allows_and_stray_blocks(self):
-        p = pk(bundle__quote="Acme hired 40 AI engineers this quarter and named Jane Doe Chief AI Officer.")
-        p["draft"]["body"] = "You hired 40 AI engineers.\n\nThat creates a tooling decision. " + MESSAGE_LINE + "\n\nWorth a call?"
+        p = pk(bundle__quote="Acme hired 40 operations specialists this quarter and named Jane Doe Chief Operating Officer.")
+        p["draft"]["body"] = "You hired 40 operations specialists.\n\nThat creates a tooling decision. " + MESSAGE_LINE + "\n\nWorth a call?"
         self.assertEqual(self.check(p), [])
-        p["draft"]["body"] = "You hired 40 AI engineers.\n\nSome teams see a 30 percent lift. " + MESSAGE_LINE + "\n\nWorth a call?"
+        p["draft"]["body"] = "You hired 40 operations specialists.\n\nSome teams see a 30 percent lift. " + MESSAGE_LINE + "\n\nWorth a call?"
         self.assertBlocks(p, "numbers in body not in the bundle quote: 30")
 
     def test_invite_minutes_exempt_only_as_invitation_in_question(self):
-        base = "You named a Chief AI Officer.\n\n" + MESSAGE_LINE + "\n\n"
+        base = "You named a Chief Operating Officer.\n\n" + MESSAGE_LINE + "\n\n"
         self.assertEqual(self.check(pk(draft__body=base + "Worth 20 minutes?")), [])
-        self.assertEqual(self.check(pk(draft__body=base + "Would you have 20 minutes to discuss?\n\nthe seller\nExample Research")), [])
-        p = pk(draft__body="You named a Chief AI Officer.\n\nI have 20 minutes free this week. " + MESSAGE_LINE + "\n\nWorth a call?")
+        self.assertEqual(self.check(pk(draft__body=base + "Would you have 20 minutes to discuss?\n\nthe seller\nExample Offer")), [])
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nI have 20 minutes free this week. " + MESSAGE_LINE + "\n\nWorth a call?")
         self.assertBlocks(p, "numbers in body not in the bundle quote: 20")
         self.assertBlocks(pk(draft__body=base + "Worth 20 minutes, maybe 30?"), "the bundle quote: 30")
 
     def test_invite_minutes_do_not_authorize_same_number_elsewhere(self):
-        p = pk(draft__body="You named a Chief AI Officer.\n\nThis cuts costs by 20%. " + MESSAGE_LINE + "\n\nWould you have 20 minutes to discuss?")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nThis cuts costs by 20%. " + MESSAGE_LINE + "\n\nWould you have 20 minutes to discuss?")
         self.assertBlocks(p, "numbers in body not in the bundle quote: 20")
 
     def test_minutes_claim_in_question_still_blocks(self):
-        base = "You named a Chief AI Officer.\n\n" + MESSAGE_LINE + "\n\n"
+        base = "You named a Chief Operating Officer.\n\n" + MESSAGE_LINE + "\n\n"
         self.assertBlocks(pk(draft__body=base + "Could this save 20 minutes per report?"), "numbers in body not in the bundle quote: 20")
         self.assertBlocks(pk(draft__body=base + "Could this save you 20 minutes on each call?"), "numbers in body not in the bundle quote: 20")
 
 
     def test_allowed_names_pass(self):
-        body = ("Hi Jane Doe,\n\nYou named Jane Doe Chief AI Officer at Acme last week.\n\n"
-                "Example Research coordinates models and tools across an assignment, so one model never carries every step.\n\n"
-                "Worth a 20 minute call?\n\nBest,\nthe seller / Example Research")
+        body = ("Hi Jane Doe,\n\nYou named Jane Doe Chief Operating Officer at Acme last week.\n\n"
+                "Example Offer coordinates project work with the customer, who reviews the final deliverable.\n\n"
+                "Worth a 20 minute call?\n\nBest,\nthe seller / Example Offer")
         self.assertEqual(self.check(pk(draft__body=body)), [])
 
 
@@ -335,7 +335,7 @@ class OutreachGateTests(unittest.TestCase):
 
     def test_present_tense_capability_flags_c_when_verify_before_action(self):
         self.assertTrue(TT["meta"]["verify_before_action"])
-        p = pk(draft__body="You named a Chief AI Officer.\n\nExample Research supports every model. " + MESSAGE_LINE + "\n\nWorth a call?")
+        p = pk(draft__body="You named a Chief Operating Officer.\n\nExample Offer supports this project type. " + MESSAGE_LINE + "\n\nWorth a call?")
         self.assertEqual(self.check(p), [])
         self.assertEqual(self.flags(p), ["verify before action. Check current support for capability wording 'supports'"])
         d = shared_copy(lambda d: edit_meta(d, verify_before_action=False))
@@ -345,13 +345,13 @@ class OutreachGateTests(unittest.TestCase):
             shutil.rmtree(d)
 
     def test_flags_never_block(self):
-        p = pk(draft__body="Example Research supports this workflow. Worth a call?")
+        p = pk(draft__body="Example Offer supports this workflow. Worth a call?")
         self.assertEqual(self.check(p), [])
         self.assertTrue(self.flags(p))
 
     def test_unknown_unit_or_signal_yields_no_crash_in_flags(self):
         self.assertEqual(self.flags(pk(talk_track__angle="nope")), [])
-        self.assertEqual(self.flags(pk(bundle__signal_type="generic_ai_marketing")), [])
+        self.assertEqual(self.flags(pk(bundle__signal_type="generic_marketing")), [])
 
     # clock and CLI
     def test_parse_now_uses_policy_timezone(self):
@@ -374,7 +374,7 @@ class OutreachGateTests(unittest.TestCase):
             out = json.loads(p.stdout)
             self.assertEqual(out["verdict"], "allow")
             self.assertEqual(out["flags"], [])
-            self.assertEqual((out["angle"], out["persona"]), ("Model flexibility", "ai_owner"))
+            self.assertEqual((out["angle"], out["persona"]), ("Implementation support", "initiative_owner"))
             self.assertNotIn("talk_track_id", out)
             p = run(pk(bundle__published_date="2026-01-01"))
             self.assertEqual(p.returncode, 1)
@@ -391,21 +391,35 @@ class WarehouseSourcedSignal(unittest.TestCase):
     """paid_individuals_present arrives as the signal-outreach wrapper around a privacy-checked signal-user-scan bundle."""
 
     ADOPTION = {
-        "account_name": "Acme", "salesforce_account_id": "001A000000AAAAA", "account_domain": "acme.example",
+        "account_name": "Acme", "crm_account_id": "001A000000AAAAA", "account_domain": "acme.example",
         "data_through_date": "2026-09-21", "mapped_org_count": 1, "org_subscribed": False, "org_paying": False,
         "org_service_types": [], "org_platforms": [], "paid_individuals_exist": True, "adoption": "individuals_only",
     }
 
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.shared = Path(self.temp.name)
+        for source in SHARED.iterdir():
+            if source.is_file(): shutil.copyfile(source, self.shared / source.name)
+        policy = yaml.safe_load((self.shared / "policy.yaml").read_text())
+        policy["user_scan"]["enabled"] = True  # explicit synthetic module fixture
+        (self.shared / "policy.yaml").write_text(yaml.safe_dump(policy))
+
     def check(self, p):
-        return og.check(p, POL, SHARED, NOW)
+        return og.check(p, POL, self.shared, NOW)
+
+    def test_disabled_subscription_module_blocks_warehouse_outreach(self):
+        reasons = og.check(self.user_scan_packet(), POL, SHARED, NOW)
+        self.assertTrue(any("adoption is disabled" in reason for reason in reasons))
 
     def user_scan_packet(self, adoption=None, **bundle_extra):
         ab = dict(self.ADOPTION, **(adoption or {}))
-        p = pk(talk_track__angle="Team workflows", talk_track__persona="ai_owner",
+        p = pk(talk_track__angle="Team workflows", talk_track__persona="initiative_owner",
                talk_track__pick_reason="Verified individual use supports exploring a team workflow without assuming who paid or company sanction.",
-               recipient__title="Head of AI",
-               draft__subject="Example Research already in use at Acme",
-               draft__body="Some of your team already pay for Example Research themselves.\n\n"
+               recipient__title="Head of Operations",
+               draft__subject="Example Offer already in use at Acme",
+               draft__body="Some of your team already pay for Example Offer themselves.\n\n"
                            + MESSAGE_LINE + "\n\n"
                            "Worth a 20 minute call?")
         p["bundle"] = {
@@ -415,7 +429,7 @@ class WarehouseSourcedSignal(unittest.TestCase):
             "adoption_bundle": ab,
         }
         p["bundle"].update(bundle_extra)
-        p["account"]["id"] = ab["salesforce_account_id"]
+        p["account"]["id"] = ab["crm_account_id"]
         return p
 
     def test_wrapped_user_scan_bundle_allows(self):
@@ -446,7 +460,7 @@ class WarehouseSourcedSignal(unittest.TestCase):
         self.assertTrue(any("needs individuals_only" in x for x in reasons), reasons)
 
     def test_quote_must_equal_policy_statement(self):
-        reasons = self.check(self.user_scan_packet(quote="Everyone at Acme uses Example Research."))
+        reasons = self.check(self.user_scan_packet(quote="Everyone at Acme uses Example Offer."))
         self.assertIn("bundle quote must equal user_scan.statements.individuals_only", reasons)
 
     def test_exact_adoption_statement_in_body_allows(self):
@@ -466,7 +480,7 @@ class WarehouseSourcedSignal(unittest.TestCase):
             self.assertTrue(any(f"must match adoption_bundle {key}" in x for x in self.check(p)), key)
 
     def test_warehouse_identity_cannot_be_blank(self):
-        for key in ("account_name", "account_domain", "salesforce_account_id", "data_through_date"):
+        for key in ("account_name", "account_domain", "crm_account_id", "data_through_date"):
             p = self.user_scan_packet()
             p["bundle"]["adoption_bundle"][key] = ""
             self.assertTrue(any(f"adoption_bundle {key} must be a nonempty string" in x for x in self.check(p)), key)

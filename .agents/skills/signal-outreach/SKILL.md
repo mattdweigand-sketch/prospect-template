@@ -1,6 +1,6 @@
 ---
 name: signal-outreach
-description: Prepare one reviewed Gmail draft from a qualified Prospect signal bundle. Use for initial signal-based outreach; post-send Task logging belongs to signal-followup.
+description: Prepare one reviewed email draft from a qualified Prospect signal bundle. Use for initial signal-based outreach; post-send Task logging belongs to signal-followup.
 ---
 
 # Signal outreach

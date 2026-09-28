@@ -12,61 +12,61 @@ capabilities:
     output_mapping: null
     completion: null
     verification_reference: null
-  salesforce.query:
+  crm.query:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  salesforce.create_account:
+  crm.create_account:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  salesforce.update_owner:
+  crm.update_owner:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  salesforce.create_contact:
+  crm.create_contact:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  salesforce.create_task:
+  crm.create_task:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  salesforce.readback:
+  crm.readback:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  gmail.search:
+  email.search:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  gmail.read_message:
+  email.read_message:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  gmail.create_draft:
+  email.create_draft:
     tool: null
     input_mapping: null
     output_mapping: null
     completion: null
     verification_reference: null
-  gmail.read_draft:
+  email.read_draft:
     tool: null
     input_mapping: null
     output_mapping: null
@@ -96,3 +96,17 @@ capabilities:
     output_mapping: null
     completion: null
     verification_reference: null
+systems:
+  crm: null
+  email: null
+records:
+  crm.account.read: null
+  crm.account.write: null
+  crm.owner.write: null
+  crm.contact.read: null
+  crm.contact.write: null
+  crm.task.read: null
+  crm.task.write: null
+  email.message.read: null
+  email.draft.read: null
+  email.draft.write: null

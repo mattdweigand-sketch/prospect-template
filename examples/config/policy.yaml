@@ -1,9 +1,9 @@
-# Fictional configuration. Replace and review before live use.
-# Dropped orgs are not reported; see the ARR query contract.
+# Fictional scaffolding. Setup must replace and review every applicable business choice.
+# Dropped orgs are not reported; see the optional ARR query contract.
 identity:
   owner_email: seller@example.test
-  sfdc_user_id: 005000000000001AAA
-  timezone: America/Los_Angeles
+  crm_user_id: example-owner
+  timezone: UTC
   internal_domains:
   - example.test
   - example.invalid
@@ -12,13 +12,11 @@ approval:
   readback_required: true
   never:
   - send email
-  - create Opportunity
+  - create deal
   - change deal stage or amount
-salesforce:
-  house_owner_ids:
-  - 005000000000002AAA
-  - 005000000000003AAA
-  open_opportunity: IsClosed = false
+crm:
+  house_owner_ids: []
+  open_deal: lifecycle is open according to the reviewed CRM status mapping
 scan:
   quote_min_words: 5
   max_signals_per_account: 3
@@ -26,9 +24,8 @@ scan:
     task_subject_markers:
     - 'Re:'
     - 'Email: << Re:'
-    task_owner: not identity.sfdc_user_id
-    ignored_owner_ids:
-    - 005000000000004AAA
+    task_owner: not identity.crm_user_id
+    ignored_owner_ids: []
 warehouse:
   name: null
   data_date: yesterday in identity.timezone
@@ -51,16 +48,15 @@ warehouse:
       sha256: null
 user_scan:
   statements:
-    org_adopted: Example Research is already adopted at the organization.
-    individuals_only: People at the organization already pay for Example Research
-      individually.
+    org_adopted: Example Offer is already adopted at the organization.
+    individuals_only: People at the organization already pay for Example Offer individually.
   adoption_values:
   - org_adopted
   - individuals_only
   - none_found
   bundle_keys:
     account_name: str
-    salesforce_account_id: str
+    crm_account_id: str
     account_domain: str
     data_through_date: str
     mapped_org_count: int
@@ -80,30 +76,29 @@ prospector:
     enabled: false
   claim_writes:
     claim_new:
-    - Account create
-    - Contact create
+    - account create
+    - contact create
     claim_transfer:
-    - Account.OwnerId update
-    - Contact create only when none exists
+    - account.owner_id update
+    - contact create only when none exists
   account_fields:
-  - Name
-  - Website
-  - OwnerId
-  - NumberOfEmployees
+  - name
+  - website
+  - owner_id
+  - headcount
   contact_fields:
-  - FirstName
-  - LastName
-  - Title
-  - Email
-  - AccountId
+  - first_name
+  - last_name
+  - title
+  - email
+  - account_id
   headcount_sources:
   - company filing or annual report
   - company site or press release
-  - PitchBook
-  - Apollo organization
+  - configured company-data provider
   contact_email_sources:
-  - existing Salesforce Contact
-  - Apollo verified
+  - existing CRM contact
+  - 'configured enrichment provider: verified'
 outreach:
   bundle_checked_max_age_hours: 24
   suppression_days: 30
@@ -113,9 +108,9 @@ outreach:
   activity_lookback_days: 30
   max_drafts_per_run: 1
   recipient_sources:
-  - existing Salesforce Contact with Email
-  - prior Gmail thread with the person
-  - Apollo verified
+  - existing CRM contact with email
+  - prior email conversation with the person
+  - 'configured enrichment provider: verified'
   - User supplied in this conversation
   talk_track:
     file: talk-track.md
@@ -140,11 +135,11 @@ followup:
   arr_growth_due_business_days: 2
   max_tasks_per_run: 1
   task:
-    Subject: 'Follow up: {gmail_subject}'
-    Status: Not Started
-    Priority: Normal
-    TaskSubtype: Task
-    Description: Follow up on signal-outreach email. Gmail message {message_id}; thread
+    subject: 'Follow up: {email_subject}'
+    status: Not Started
+    priority: Normal
+    subtype: Task
+    description: Follow up on signal-outreach email. Sent message {message_id}; thread
       {thread_id}. signal_type {signal_type}; unit {unit}.
   closed_statuses:
   - Completed
@@ -157,10 +152,10 @@ arr_growth:
   recipient_platform: web
   suppression_days: 30
   draft:
-    subject: Your Example Research subscription
+    subject: Your Example Offer subscription
     greeting_person: Hi {first_name},
     greeting_team: Hi {account_name} team,
-    body: 'Thanks for being an Example Research customer. Would you be open to discussing
+    body: 'Thanks for being an Example Offer customer. Would you be open to discussing
       which subscription option fits your team?
 
 
@@ -179,8 +174,8 @@ arr_growth:
 schema_version: 1
 deployment:
   mode: example
-  business_name: Example Research
-  product_name: Example Research
+  business_name: Example Company
+  product_name: Example Offer
   review_reference: null
 email_voice:
   file: voice.md

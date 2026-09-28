@@ -47,7 +47,7 @@ class SetupLifecycle(unittest.TestCase):
     def configure(self):
         def settings(p):
             p['deployment'].update(mode='configured',business_name='Synthetic Advisory',product_name='Supplier Brief Service',review_reference='synthetic meaning review')
-            p['identity'].update(owner_email='seller@synthetic-advisory.org',sfdc_user_id='005123456789012AAA')
+            p['identity'].update(owner_email='seller@synthetic-advisory.org',crm_user_id='005123456789012AAA')
             p['email_voice']['source_reference']='voice.txt'
             p['retention']['review_reference']='synthetic retention decision'
         self.policy(settings)
@@ -87,27 +87,27 @@ class SetupLifecycle(unittest.TestCase):
         policy=yaml.safe_load((config/'policy.yaml').read_text())
         now=datetime.now(timezone.utc); today=now.date()
         page='Acme has launched a supplier comparison project led by Jordan, procurement director.'
-        receipt={'account_name':'Acme','account_aliases':['Acme'],'account_domain':'acme.example','source_url':'https://acme.example/news','published_date':today.isoformat(),'quote':page,'evidence_subject':'Acme','signal_type':'supplier_review','quote_speaker':'account','classification':'active_initiative','relevance':'employee_use'}
+        receipt={'account_name':'Acme','account_aliases':['Acme'],'account_domain':'acme.example','source_url':'https://acme.example/news','published_date':today.isoformat(),'quote':page,'evidence_subject':'Acme','signal_type':'supplier_review','quote_speaker':'account','classification':'active_initiative','relevance':'relevant_to_offer','fit_reason':'The project requires the configured comparison-research deliverable.'}
         _,scan,types=evidence_gate.load_rules(config)
         code,evidence=evidence_gate.grade(receipt,page,scan,types,today,now)
         self.assertEqual(code,0)
         self.assertEqual(sv.verdict([evidence])['recommended'],1)
         rules=route_candidate.load_rules(config)
-        candidate={'domain':'acme.example','headcount':1000,'signals':[{'signal_type':'supplier_review','tier':'tier1'}],'account_exists':True,'owner_id':policy['identity']['sfdc_user_id'],'owner_is_active':True,'open_opportunity_ids':[]}
+        candidate={'domain':'acme.example','headcount':1000,'signals':[{'signal_type':'supplier_review','tier':'tier1'}],'account_exists':True,'owner_id':policy['identity']['crm_user_id'],'owner_is_active':True,'open_deal_ids':[]}
         routed=route_candidate.check(candidate,rules)
         self.assertEqual(routed['route'],'scan')
-        packet={'bundle':evidence['bundle'],'talk_track':{'angle':'Supplier comparison research','persona':'Procurement project owner','pick_reason':'The named owner runs the announced comparison project.'},'recipient':{'email':'jordan@acme.example','name':'Jordan','title':'Procurement director','source':'existing Salesforce Contact with Email','contact_id':'003SYNTHETIC'},'activity':[], 'account':{'id':'001SYNTHETIC','domain':'acme.example','owner_id':policy['identity']['sfdc_user_id'],'owner_is_active':True,'open_opportunity_ids':[]},'reads':{name:{'complete':True,'query_reference':'synthetic:'+name,'checked_at':now.isoformat(),'account_domain':'acme.example','recipient_email':'jordan@acme.example','window_start':(today-timedelta(days=31)).isoformat()} for name in ('tasks','events','gmail_sent')},'draft':{'subject':'Supplier comparison project','body':'I saw your supplier comparison project. '+CLAIM+' Would a sample brief be useful?'}}
+        packet={'bundle':evidence['bundle'],'talk_track':{'angle':'Supplier comparison research','persona':'Procurement project owner','pick_reason':'The named owner runs the announced comparison project.'},'recipient':{'email':'jordan@acme.example','name':'Jordan','title':'Procurement director','source':'existing CRM contact with email','contact_id':'003SYNTHETIC'},'activity':[], 'account':{'id':'001SYNTHETIC','domain':'acme.example','owner_id':policy['identity']['crm_user_id'],'owner_is_active':True,'open_deal_ids':[]},'reads':{name:{'complete':True,'query_reference':'synthetic:'+name,'checked_at':now.isoformat(),'account_domain':'acme.example','recipient_email':'jordan@acme.example','window_start':(today-timedelta(days=31)).isoformat()} for name in ('tasks','events','email_sent')},'draft':{'subject':'Supplier comparison project','body':'I saw your supplier comparison project. '+CLAIM+' Would a sample brief be useful?'}}
         self.assertEqual(og.check(packet,policy['outreach'],config,now),[])
         approved={'to':packet['recipient']['email'],**packet['draft']}
         simulated_native={**approved,'cc':[],'bcc':[],'message_id':'synthetic-message','draft_id':'synthetic-draft'}
-        self.assertEqual(readback_check.compare(approved,simulated_native,gmail=True)['verdict'],'match')
+        self.assertEqual(readback_check.compare(approved,simulated_native,email=True)['verdict'],'match')
         bad={**simulated_native,'bcc':['extra@acme.example']}
-        self.assertEqual(readback_check.compare(approved,bad,gmail=True)['verdict'],'mismatch')
-        followup={'sent':[{'message_id':'synthetic-sent','thread_id':'synthetic-thread','subject':approved['subject'],'sent_at':now.isoformat(),'to':approved['to']}],'account':{'id':'001SYNTHETIC','owner_id':policy['identity']['sfdc_user_id']},'contacts':[{'id':'003SYNTHETIC','email':approved['to']}],'tasks':[],'signal':{'signal_type':'supplier_review','angle':'Supplier comparison research'}}
+        self.assertEqual(readback_check.compare(approved,bad,email=True)['verdict'],'mismatch')
+        followup={'sent':[{'message_id':'synthetic-sent','is_sent':True,'thread_id':'synthetic-thread','subject':approved['subject'],'sent_at':now.isoformat(),'to':approved['to']}],'account':{'id':'001SYNTHETIC','owner_id':policy['identity']['crm_user_id']},'contacts':[{'id':'003SYNTHETIC','email':approved['to']}],'tasks':[],'signal':{'signal_type':'supplier_review','angle':'Supplier comparison research'}}
         result=fg.check(followup,'standard',policy,today=today)
         self.assertEqual(result['verdict'],'allow')
-        self.assertEqual(result['task']['WhatId'],'001SYNTHETIC')
-        self.assertEqual(result['task']['WhoId'],'003SYNTHETIC')
+        self.assertEqual(result['task']['account_id'],'001SYNTHETIC')
+        self.assertEqual(result['task']['contact_id'],'003SYNTHETIC')
         self.assertEqual(readback_check.compare(result['task'],{**result['task'],'Id':'00TSYNTHETIC'})['verdict'],'match')
         followup['sent']=[]
         self.assertEqual(fg.check(followup,'standard',policy,today=today)['verdict'],'block')
@@ -180,7 +180,7 @@ class SetupLifecycle(unittest.TestCase):
     def test_custom_native_status_map(self):
         def change(p):
             p['outreach']['task_status_map']={'Done':'completed','Planned':'open','Cancelled':'cancelled'}
-            p['followup']['task']['Status']='Planned'; p['followup']['closed_statuses']=['Done','Cancelled']
+            p['followup']['task']['status']='Planned'; p['followup']['closed_statuses']=['Done','Cancelled']
         self.policy(change)
         self.assertEqual(vs.validate(self.config,self.root)['status'],'valid_configuration_not_approval')
 
@@ -192,6 +192,9 @@ class SetupLifecycle(unittest.TestCase):
 
     def test_provider_mapping_is_not_live_access(self):
         providers=yaml.safe_load((self.config/'providers.yaml').read_text())
+        import provider_map
+        providers['systems']={'crm':'Synthetic CRM','email':'Synthetic Mail'}
+        providers['records']={name:{field:{'path':'/'+field} for field in fields} for name,fields in provider_map.CONTRACTS.items()}
         for capability in providers['capabilities'].values():
             capability.update(tool='synthetic_tool',input_mapping='synthetic fields',output_mapping='synthetic fields',completion='all pages complete',verification_reference='synthetic schema')
         (self.config/'providers.yaml').write_text(yaml.safe_dump(providers))

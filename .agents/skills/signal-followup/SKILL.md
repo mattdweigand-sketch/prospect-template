@@ -1,6 +1,6 @@
 ---
 name: signal-followup
-description: Prepare a Salesforce follow-up Task after a proven Gmail send from Prospect outreach or ARR-growth outreach. Use when asked to log or create the post-send follow-up.
+description: Prepare a CRM follow-up Task after a proven email send from Prospect outreach or ARR-growth outreach. Use when asked to log or create the post-send follow-up.
 ---
 
 # Signal follow-up

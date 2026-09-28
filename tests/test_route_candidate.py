@@ -15,15 +15,15 @@ import common  # noqa: E402
 import route_candidate as rc  # noqa: E402
 
 RULES = rc.load_rules(SHARED)
-T1 = [{"signal_type": "public_ai_initiative", "tier": "tier1"}]
-T2 = [{"signal_type": "exec_ai_statements", "tier": "tier2"}]
-T3 = [{"signal_type": "generic_ai_marketing", "tier": "tier3"}]
+T1 = [{"signal_type": "announced_initiative", "tier": "tier1"}]
+T2 = [{"signal_type": "leader_priority_statement", "tier": "tier2"}]
+T3 = [{"signal_type": "generic_marketing", "tier": "tier3"}]
 WH = [{"signal_type": "paid_individuals_present", "tier": "tier2"}]
 
 
 def receipt(**kw):
     base = {"domain": "acme.example", "headcount": 1200, "signals": T1, "account_exists": False,
-            "owner_id": None, "owner_is_active": None, "open_opportunity_ids": []}
+            "owner_id": None, "owner_is_active": None, "open_deal_ids": []}
     base.update(kw)
     return base
 
@@ -39,14 +39,14 @@ def run_cli(payload, raw=None):
 
 class RouteCandidateTests(unittest.TestCase):
     def test_rules_load_from_shared_files(self):
-        self.assertTrue(RULES["owner"].startswith("005"))
-        self.assertEqual((RULES["min_emp"], RULES["max_emp"]), (200, 5000))
+        self.assertEqual(RULES["owner"], rc.common.load_policy(SHARED)["identity"]["crm_user_id"])
+        self.assertEqual((RULES["min_emp"], RULES["max_emp"]), (50, 10000))
         self.assertEqual(len(RULES["house"]), 2)
 
     def test_rules_carry_taxonomy_types_and_admission(self):
-        self.assertEqual(RULES["types"]["public_ai_initiative"]["tier"], "tier1")
+        self.assertEqual(RULES["types"]["announced_initiative"]["tier"], "tier1")
         self.assertTrue(RULES["types"]["paid_individuals_present"]["source"])
-        self.assertIsNone(RULES["types"]["exec_ai_statements"]["source"])
+        self.assertIsNone(RULES["types"]["leader_priority_statement"]["source"])
         self.assertEqual(RULES["admission"], {"tier1_min": 1, "tier2_min": 2, "warehouse_needs_web_tier2": True,
                                               "warehouse_max_counted": 1})
 
@@ -111,10 +111,10 @@ class RouteCandidateTests(unittest.TestCase):
 
     def test_mis_tiered_signal_is_error(self):
         with self.assertRaises(ValueError):
-            rc.check(receipt(signals=[{"signal_type": "exec_ai_statements", "tier": "tier1"}]), RULES)
+            rc.check(receipt(signals=[{"signal_type": "leader_priority_statement", "tier": "tier1"}]), RULES)
 
     def test_signal_without_shape_is_error(self):
-        for bad in (["tier1"], [{"tier": "tier1"}], [{"signal_type": "public_ai_initiative"}]):
+        for bad in (["tier1"], [{"tier": "tier1"}], [{"signal_type": "announced_initiative"}]):
             with self.assertRaises(ValueError):
                 rc.check(receipt(signals=bad), RULES)
 
@@ -132,19 +132,19 @@ class RouteCandidateTests(unittest.TestCase):
 
     def test_seller_owned_open_opp_is_active_deal(self):
         out = rc.check(receipt(account_exists=True, owner_id=RULES["owner"], owner_is_active=True,
-                               open_opportunity_ids=["006x"]), RULES)
+                               open_deal_ids=["006x"]), RULES)
         self.assertEqual(out["route"], "active_deal")
 
-    def test_open_opportunity_precedes_every_existing_owner_route(self):
+    def test_open_deal_precedes_every_existing_owner_route(self):
         for owner, active in ((sorted(RULES["house"])[0], True), ("005other", False), ("005other", True)):
             with self.subTest(owner=owner, active=active):
                 out = rc.check(receipt(account_exists=True, owner_id=owner, owner_is_active=active,
-                                       open_opportunity_ids=["006OPEN"]), RULES)
+                                       open_deal_ids=["006OPEN"]), RULES)
                 self.assertEqual((out["route"], out["claimable"]), ("active_deal", False))
 
-    def test_unknown_or_malformed_salesforce_reads_are_not_absence(self):
+    def test_unknown_or_malformed_crm_reads_are_not_absence(self):
         for changes in ({"account_exists": None}, {"account_exists": "false"},
-                        {"open_opportunity_ids": None}, {"open_opportunity_ids": [None]},
+                        {"open_deal_ids": None}, {"open_deal_ids": [None]},
                         {"account_exists": True, "owner_id": RULES["owner"], "owner_is_active": None}):
             with self.subTest(changes=changes):
                 out = run_cli(receipt(**changes))
@@ -179,11 +179,11 @@ class RouteCandidateTests(unittest.TestCase):
 
     def test_icp_rules_load(self):
         self.assertEqual(RULES["vertical_rank"]["professional_services"], 1)
-        self.assertIn("coding_assistance_only_requirement", RULES["hard_dq"])
-        self.assertIn("no_recurring_valuable_workflow", RULES["recoverable_dq"])
+        self.assertIn("outside_offer_scope", RULES["hard_dq"])
+        self.assertIn("unclear_relevant_need", RULES["recoverable_dq"])
 
     def test_vertical_rank_emitted(self):
-        out = rc.check(receipt(vertical="legal"), RULES)
+        out = rc.check(receipt(vertical="retail"), RULES)
         self.assertEqual((out["vertical_rank"], out["claimable"]), (3, True))
 
     def test_no_vertical_is_null_rank(self):
@@ -194,13 +194,13 @@ class RouteCandidateTests(unittest.TestCase):
             rc.check(receipt(vertical="fintech"), RULES)
 
     def test_hard_disqualifier_blocks_claim(self):
-        out = rc.check(receipt(disqualifiers=["coding_assistance_only_requirement"]), RULES)
+        out = rc.check(receipt(disqualifiers=["outside_offer_scope"]), RULES)
         self.assertEqual((out["route"], out["claimable"], out["hard_disqualifiers"]),
-                         ("claim_new", False, ["coding_assistance_only_requirement"]))
+                         ("claim_new", False, ["outside_offer_scope"]))
 
     def test_recoverable_blocker_reported_not_blocking(self):
-        out = rc.check(receipt(disqualifiers=["no_recurring_valuable_workflow"]), RULES)
-        self.assertEqual((out["claimable"], out["recoverable_blockers"]), (True, ["no_recurring_valuable_workflow"]))
+        out = rc.check(receipt(disqualifiers=["unclear_relevant_need"]), RULES)
+        self.assertEqual((out["claimable"], out["recoverable_blockers"]), (True, ["unclear_relevant_need"]))
 
     def test_unknown_disqualifier_is_error(self):
         with self.assertRaises(ValueError):

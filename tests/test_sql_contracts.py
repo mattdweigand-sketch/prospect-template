@@ -63,14 +63,14 @@ class SqlContracts(unittest.TestCase):
                            re.sub(pattern.replace("\\\\", "\\"), replacement, value))
         db.executescript("""
           CREATE TABLE account (id TEXT, name TEXT, owner_id TEXT, number_of_employees INT, website TEXT, is_deleted BOOL);
-          CREATE TABLE dim_user_attributes (user_id TEXT, email_domain TEXT);
-          CREATE TABLE dim_subscription_user_daily (user_id TEXT, date_pt TEXT, is_paying BOOL);
-          CREATE TABLE dim_organizations (organization_uuid TEXT, is_deleted BOOL);
-          CREATE TABLE int_organization_salesforce_identity (organization_uuid TEXT, salesforce_account_id TEXT, is_identity_unambiguous BOOL);
-          CREATE TABLE dim_organization_subscription_daily (organization_uuid TEXT, date_pt TEXT, is_subscribed BOOL);
+          CREATE TABLE user_domains (user_id TEXT, email_domain TEXT);
+          CREATE TABLE paid_individual_subscription_daily (user_id TEXT, snapshot_date TEXT, is_paying BOOL);
+          CREATE TABLE organizations (organization_uuid TEXT, is_deleted BOOL);
+          CREATE TABLE organization_account_map (organization_uuid TEXT, crm_account_id TEXT, is_unambiguous BOOL);
+          CREATE TABLE organization_subscription_daily (organization_uuid TEXT, snapshot_date TEXT, is_subscribed BOOL);
           INSERT INTO account VALUES ('001A', 'Acme', 'SELLER', 1000, 'HTTPS://www.Acme.example/path', FALSE);
-          INSERT INTO dim_user_attributes VALUES ('synthetic-user', 'acme.example');
-          INSERT INTO dim_subscription_user_daily VALUES ('synthetic-user', '2026-09-24', TRUE);
+          INSERT INTO user_domains VALUES ('synthetic-user', 'acme.example');
+          INSERT INTO paid_individual_subscription_daily VALUES ('synthetic-user', '2026-09-24', TRUE);
         """)
         sql = QUERIES["adoption_territory.sql"].read_text().replace("prospect_source.", "").replace("prospect_source.", "")
         sql = sql.replace("BOOLOR_AGG(", "MAX(")
@@ -82,11 +82,11 @@ class SqlContracts(unittest.TestCase):
         self.assertEqual(rows(), [])
         db.execute("UPDATE account SET is_deleted = TRUE WHERE id = '001B'")
         self.assertEqual([row[0] for row in rows()], ["001A"])
-        db.execute("INSERT INTO dim_organizations VALUES ('org-1', TRUE)")
-        db.execute("INSERT INTO int_organization_salesforce_identity VALUES ('org-1', '001A', TRUE)")
-        db.execute("INSERT INTO dim_organization_subscription_daily VALUES ('org-1', '2026-09-24', TRUE)")
+        db.execute("INSERT INTO organizations VALUES ('org-1', TRUE)")
+        db.execute("INSERT INTO organization_account_map VALUES ('org-1', '001A', TRUE)")
+        db.execute("INSERT INTO organization_subscription_daily VALUES ('org-1', '2026-09-24', TRUE)")
         self.assertEqual([row[0] for row in rows()], ["001A"])
-        db.execute("UPDATE dim_organizations SET is_deleted = FALSE")
+        db.execute("UPDATE organizations SET is_deleted = FALSE")
         self.assertEqual(rows(), [])
 
 

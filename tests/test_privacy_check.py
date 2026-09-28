@@ -15,14 +15,14 @@ import privacy_check  # noqa: E402
 
 CLEAN = {
     "account_name": "Example Buyer",
-    "salesforce_account_id": "001cv0000082HOjAAM",
+    "crm_account_id": "001cv0000082HOjAAM",
     "account_domain": "buyer.example",
     "data_through_date": "2026-09-20",
     "mapped_org_count": 1,
     "org_subscribed": True,
     "org_paying": True,
     "org_service_types": ["SELF_SERVE"],
-    "org_platforms": ["stripe"],
+    "org_platforms": ["web"],
     "paid_individuals_exist": True,
     "adoption": "org_adopted",
 }
@@ -84,7 +84,7 @@ class PrivacyCheckTests(unittest.TestCase):
         self.assertNotIn("non-scalar element in org_platforms", out["problems"])
 
     def test_nested_list_blocked(self):
-        code, out = run({**CLEAN, "org_platforms": [["stripe"]]})
+        code, out = run({**CLEAN, "org_platforms": [["web"]]})
         self.assertEqual(code, 1)
         self.assertIn("non-scalar element in org_platforms", out["problems"])
 

@@ -6,10 +6,10 @@
 |---|---|---|
 | Reference | `../../.local/config/signals.md` | Discovery, classification, evidence and qualification |
 | Reference | `../../.local/config/icp.md` | Target personas section |
-| Reference | `../../.local/config/policy.yaml` | scan, salesforce, identity, outreach |
+| Reference | `../../.local/config/policy.yaml` | scan, crm, identity, outreach |
 | Tool | `../../_shared/scripts/route_candidate.py` | Ownership route table |
 | Tool | `../../_shared/scripts/evidence_gate.py`; `scan_verdict.py` | Receipt validation and report verdict; docstrings define inputs |
-| Working | Named account, Salesforce reads and fetched public pages | Current source text in temporary sandbox files |
+| Working | Named account, CRM reads and fetched public pages | Current source text in temporary sandbox files |
 
 ## Process
 

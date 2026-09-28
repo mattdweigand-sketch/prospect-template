@@ -4,11 +4,11 @@
 
 | Kind | Path or source | Load / purpose |
 |---|---|---|
-| Reference | `../../.local/config/policy.yaml` | user_scan, salesforce, identity, warehouse |
+| Reference | `../../.local/config/policy.yaml` | user_scan, crm, identity, warehouse |
 | Tool | `../../_shared/scripts/route_candidate.py` | Ownership route table |
 | Tool | `adoption_lookup.sql` | Read-only adoption query; bindings in its header |
 | Tool | `../../_shared/scripts/privacy_check.py` | Bundle schema and privacy checks |
-| Working | Named Account/Id, Salesforce reads and the warehouse query result | This run only; ambiguous Account matches require an Id |
+| Working | Named Account/Id, CRM reads and the warehouse query result | This run only; ambiguous Account matches require an Id |
 
 ## Process
 

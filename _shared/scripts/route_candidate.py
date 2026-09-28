@@ -12,16 +12,16 @@ receipt.json
                                                               # one warehouse signal built by signal-prospector from
                                                               # adoption_territory.sql
       "account_exists": true | false,
-      "owner_id": "005..." | null,
+      "owner_id": "owner-123" | null,
       "owner_is_active": true | false | null,
-      "open_opportunity_ids": ["006..."],
-      "vertical": "financial_services" | null,     # optional. An id from icp.md frontmatter verticals, null when unknown
-      "disqualifiers": ["coding_assistance_only_requirement"]   # optional. Ids from icp.md frontmatter disqualifiers seen in evidence
+      "open_deal_ids": ["deal-123"],
+      "vertical": "professional_services" | null,     # optional. An id from icp.md frontmatter verticals, null when unknown
+      "disqualifiers": ["outside_offer_scope"]   # optional. Ids from icp.md frontmatter disqualifiers seen in evidence
     }
 
 Rules come from .local/config/signals.md (tier ids, admission thresholds, warehouse pairing), .local/config/icp.md
-frontmatter (territory, verticals, disqualifiers), and .local/config/policy.yaml (identity.sfdc_user_id,
-salesforce.house_owner_ids). Never edit them here.
+frontmatter (territory, verticals, disqualifiers), and .local/config/policy.yaml (identity.crm_user_id,
+crm.house_owner_ids). Never edit them here.
 
 Admission. Every signal names a tier1, tier2, or tier3 id and the tier the taxonomy gives it. Anything else is exit 2.
 tier3 never counts. Warehouse signals (taxonomy entries with `source`) count at most admission.warehouse_max_counted
@@ -29,8 +29,8 @@ times, default 1 when the key is absent, and only when a web tier2 signal is bes
 (admission.warehouse_needs_web_tier2). Then admission.tier1_min tier1 or admission.tier2_min tier2.
 
 Routes: claim_new, claim_transfer, scan, active_deal, owned_elsewhere. route() is the route table.
-Order. No Account, claim_new. Any open Opportunity, active_deal. Inactive owner or an id in house_owner_ids,
-claim_transfer. Owner is identity.sfdc_user_id, scan. Any other owner, owned_elsewhere.
+Order. No Account, claim_new. Any open deal, active_deal. Inactive owner or an id in house_owner_ids,
+claim_transfer. Owner is identity.crm_user_id, scan. Any other owner, owned_elsewhere.
 A claim route is only emitted when admitted, in territory, and free of hard disqualifiers. Otherwise the route is kept and
 `claimable` is false. `vertical_rank` is the icp.md rank or null. An unknown vertical or disqualifier id is exit 2.
 
@@ -43,7 +43,7 @@ from pathlib import Path
 
 import common
 
-KEYS = {"domain", "headcount", "signals", "account_exists", "owner_id", "owner_is_active", "open_opportunity_ids"}
+KEYS = {"domain", "headcount", "signals", "account_exists", "owner_id", "owner_is_active", "open_deal_ids"}
 OPTIONAL = {"vertical", "disqualifiers"}
 COUNTED_TIERS = ("tier1", "tier2")
 
@@ -53,8 +53,8 @@ def load_rules(shared):
     icp_fm = common.icp_frontmatter(shared)
     tax = common.load_taxonomy(shared)
     return {
-        "owner": policy["identity"]["sfdc_user_id"],
-        "house": set(policy["salesforce"]["house_owner_ids"]),
+        "owner": policy["identity"]["crm_user_id"],
+        "house": set(policy["crm"]["house_owner_ids"]),
         "min_emp": int(icp_fm["territory"]["min_employees"]),
         "max_emp": int(icp_fm["territory"]["max_employees"]),
         "vertical_rank": {v["id"]: int(v["rank"]) for v in icp_fm["verticals"]},
@@ -110,17 +110,17 @@ def territory(headcount, rules):
 def route(r, rules):
     if not isinstance(r["account_exists"], bool):
         raise ValueError("account_exists must be a boolean, not an unknown read")
-    if not isinstance(r["open_opportunity_ids"], list) or any(
-            not isinstance(v, str) or not v.strip() for v in r["open_opportunity_ids"]):
-        raise ValueError("open_opportunity_ids must be a list of nonempty ids")
+    if not isinstance(r["open_deal_ids"], list) or any(
+            not isinstance(v, str) or not v.strip() for v in r["open_deal_ids"]):
+        raise ValueError("open_deal_ids must be a list of nonempty ids")
     if r["account_exists"] and (not isinstance(r["owner_id"], str) or not r["owner_id"].strip()
                                 or not isinstance(r["owner_is_active"], bool)):
         raise ValueError("existing Account needs owner_id and boolean owner_is_active")
     if not r["account_exists"]:
-        if r["open_opportunity_ids"]:
-            raise ValueError("absent Account cannot have open Opportunities")
+        if r["open_deal_ids"]:
+            raise ValueError("absent Account cannot have open deals")
         return "claim_new"
-    if r["open_opportunity_ids"]:
+    if r["open_deal_ids"]:
         return "active_deal"
     if r["owner_is_active"] is False or r["owner_id"] in rules["house"]:
         return "claim_transfer"
@@ -149,8 +149,8 @@ def check(r, rules):
     missing, extra = sorted(KEYS - set(r)), sorted(set(r) - KEYS - OPTIONAL)
     if missing or extra:
         raise ValueError(f"receipt keys mismatch: missing={missing} extra={extra}")
-    if not isinstance(r["signals"], list) or not isinstance(r["open_opportunity_ids"], list):
-        raise ValueError("signals and open_opportunity_ids must be lists")
+    if not isinstance(r["signals"], list) or not isinstance(r["open_deal_ids"], list):
+        raise ValueError("signals and open_deal_ids must be lists")
     admitted, why = admission(r["signals"], rules)
     terr = territory(r["headcount"], rules)
     rt = route(r, rules)

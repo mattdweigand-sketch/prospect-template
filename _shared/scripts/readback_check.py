@@ -5,8 +5,8 @@ Called by signal-outreach, signal-arr-growth, signal-followup and signal-prospec
 Pass --expected proposal.json and --actual readback.json. Both contain objects;
 expected contains only the approved provider field names. Actual is the returned
 record, or a literal extraction of those returned fields, never a reconstruction
-from the proposal. For Gmail use --gmail with all of to, subject and body; preserve
-any returned cc/bcc fields, which must be absent or empty. Top-level provider
+from the proposal. For email provider use --email with all of to, subject and body; preserve
+complete cc/bcc fields, which must be explicitly empty. Top-level provider
 metadata may be extra; changed field values/types and list order differences fail.
 
 This verifies field equality, not provider authenticity or human authorization.
@@ -36,13 +36,16 @@ def differences(expected, actual, path=""):
     return [] if expected == actual else [path or "$"]
 
 
-def compare(expected, actual, gmail=False):
+def compare(expected, actual, email=False):
     if not isinstance(expected, dict) or not expected or not isinstance(actual, dict):
         raise ValueError("expected must be a nonempty object and actual a provider object")
     changed = []
-    if gmail:
+    if email:
         if not {"to", "subject", "body"} <= set(expected):
-            raise ValueError("Gmail comparison requires approved to, subject, and body")
+            raise ValueError("email provider comparison requires approved to, subject, and body")
+        for key in ("cc", "bcc"):
+            if key not in actual:
+                changed.append(key + " (missing recipient coverage)")
         for record in (expected, actual):
             for key, value in record.items():
                 if key.lower() in ("cc", "bcc") and value not in ([], ""):
@@ -66,10 +69,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--expected", required=True)
     parser.add_argument("--actual", required=True)
-    parser.add_argument("--gmail", action="store_true", help="require complete draft fields and no CC/BCC recipients")
+    parser.add_argument("--email", action="store_true", help="require complete draft fields and no CC/BCC recipients")
     args = parser.parse_args()
     try:
-        result = compare(load(args.expected), load(args.actual), gmail=args.gmail)
+        result = compare(load(args.expected), load(args.actual), email=args.email)
     except (OSError, ValueError, TypeError) as error:
         print(json.dumps({"verdict": "error", "reason": str(error)}))
         return 2

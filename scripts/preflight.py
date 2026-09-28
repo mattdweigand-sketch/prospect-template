@@ -9,12 +9,12 @@ import setup_common as sc
 from validate_setup import validate, require
 
 CAPABILITIES = {
- 'signal-scan': ['web.search','web.fetch','salesforce.query'],
- 'signal-prospector': ['web.search','web.fetch','salesforce.query'],
- 'signal-outreach': ['salesforce.query','gmail.search','gmail.read_message','gmail.create_draft','gmail.read_draft'],
- 'signal-followup': ['salesforce.query','salesforce.create_task','salesforce.readback','gmail.search','gmail.read_message'],
- 'signal-user-scan': ['salesforce.query','warehouse.query','warehouse.status','warehouse.results'],
- 'signal-arr-growth': ['salesforce.query','gmail.search','gmail.read_message','gmail.create_draft','gmail.read_draft','warehouse.query','warehouse.status','warehouse.results'],
+ 'signal-scan': ['web.search','web.fetch','crm.query'],
+ 'signal-prospector': ['web.search','web.fetch','crm.query'],
+ 'signal-outreach': ['crm.query','email.search','email.read_message','email.create_draft','email.read_draft'],
+ 'signal-followup': ['crm.query','crm.create_task','crm.readback','email.search','email.read_message'],
+ 'signal-user-scan': ['crm.query','warehouse.query','warehouse.status','warehouse.results'],
+ 'signal-arr-growth': ['crm.query','email.search','email.read_message','email.create_draft','email.read_draft','warehouse.query','warehouse.status','warehouse.results'],
 }
 
 
@@ -32,7 +32,7 @@ def check(workflow, root=sc.ROOT):
     if workflow == 'signal-prospector' and policy['prospector']['adoption_source']['enabled']:
         required += ['warehouse.query','warehouse.status','warehouse.results']
     missing = [name for name in required if not caps[name]['tool']]
-    conditional = ['salesforce.create_account','salesforce.update_owner','salesforce.create_contact','salesforce.readback','enrichment.verified_contact'] if workflow == 'signal-prospector' else []
+    conditional = ['crm.create_account','crm.update_owner','crm.create_contact','crm.readback','enrichment.verified_contact'] if workflow == 'signal-prospector' else []
     conditional_missing = [name for name in conditional if not caps[name]['tool']]
     return {'status':'missing_provider_mappings' if missing else 'configured_needs_live_reads', 'workflow':workflow, 'missing':missing, 'conditional_missing':conditional_missing, 'limit':'Tool discovery and complete authorized live reads are still required. Mappings and receipts are not proof of provider access or human consent.'}
 

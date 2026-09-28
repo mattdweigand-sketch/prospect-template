@@ -98,3 +98,9 @@ def error_json(exc):
 
 
 INPUT_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError, yaml.YAMLError, json.JSONDecodeError)
+
+
+def opaque_id(value):
+    """Nonempty, unpadded text without control characters; never infer provider or case-fold."""
+    return (isinstance(value, str) and bool(value) and value == value.strip()
+            and all(ord(c) >= 32 and ord(c) != 127 for c in value))

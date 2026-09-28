@@ -42,7 +42,7 @@ class LoadersTests(unittest.TestCase):
 
     def test_load_policy_reads_identity(self):
         self.assertEqual(POLICY["identity"]["timezone"], "America/Los_Angeles")
-        self.assertTrue(POLICY["identity"]["sfdc_user_id"].startswith("005"))
+        self.assertTrue(common.opaque_id(POLICY["identity"]["crm_user_id"]))
 
     def test_load_policy_missing_dir_raises_oserror(self):
         with self.assertRaises(OSError):
@@ -70,11 +70,11 @@ class LoadersTests(unittest.TestCase):
 
     def test_load_taxonomy_and_entry_lookup(self):
         tax = common.load_taxonomy(SHARED)
-        entry, tier = common.taxonomy_entry(tax, "public_ai_initiative")
-        self.assertEqual((entry["id"], tier), ("public_ai_initiative", "tier1"))
-        entry, tier = common.taxonomy_entry(tax, "exec_ai_statements")
+        entry, tier = common.taxonomy_entry(tax, "announced_initiative")
+        self.assertEqual((entry["id"], tier), ("announced_initiative", "tier1"))
+        entry, tier = common.taxonomy_entry(tax, "leader_priority_statement")
         self.assertEqual(tier, "tier2")
-        self.assertEqual(common.taxonomy_entry(tax, "generic_ai_marketing"), (None, None))
+        self.assertEqual(common.taxonomy_entry(tax, "generic_marketing"), (None, None))
         self.assertEqual(common.taxonomy_entry(tax, "vibes"), (None, None))
 
     def test_load_talk_track_live_file(self):
@@ -92,10 +92,10 @@ class LoadersTests(unittest.TestCase):
         tax = common.load_taxonomy(SHARED)
         types = common.taxonomy_types(tax)
         self.assertEqual(len(types), sum(len(v) for v in tax["tiers"].values()))
-        self.assertEqual(types["generic_ai_marketing"]["tier"], "tier3")
+        self.assertEqual(types["generic_marketing"]["tier"], "tier3")
         self.assertTrue(types["paid_individuals_present"]["source"].endswith(".sql"))
-        self.assertIsNone(types["ai_exec_appointment"]["source"])
-        self.assertEqual(types["ai_exec_appointment"]["freshness_days"], 90)
+        self.assertIsNone(types["relevant_leader_appointment"]["source"])
+        self.assertEqual(types["relevant_leader_appointment"]["freshness_days"], 90)
 
 
 class ClockTests(unittest.TestCase):

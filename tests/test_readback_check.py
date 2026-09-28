@@ -14,7 +14,7 @@ import readback_check
 
 
 class ReadbackTests(unittest.TestCase):
-    def test_exact_gmail_fields_with_provider_metadata(self):
+    def test_exact_email_fields_with_provider_metadata(self):
         proposal = {"to": "jane@example.com", "subject": "Question", "body": "Hello\n\nthe seller"}
         self.assertEqual("match", readback_check.compare(proposal, {**proposal, "id": "draft-1"})["verdict"])
 
@@ -26,9 +26,9 @@ class ReadbackTests(unittest.TestCase):
                 self.assertEqual([field], readback_check.compare(proposal, actual)["fields"])
 
     def test_missing_null_and_type_changes_are_not_matches(self):
-        self.assertEqual("mismatch", readback_check.compare({"WhoId": None}, {})["verdict"])
+        self.assertEqual("mismatch", readback_check.compare({"contact_id": None}, {})["verdict"])
         self.assertEqual("mismatch", readback_check.compare({"Enabled": True}, {"Enabled": 1})["verdict"])
-        self.assertEqual("mismatch", readback_check.compare({"ActivityDate": "2026-09-30"}, {"ActivityDate": None})["verdict"])
+        self.assertEqual("mismatch", readback_check.compare({"due_date": "2026-09-30"}, {"due_date": None})["verdict"])
 
     def test_nested_fields_and_order(self):
         self.assertEqual("mismatch", readback_check.compare({"record": {"Id": "001"}}, {"record": {"Id": "001", "type": "Account"}})["verdict"])
@@ -38,23 +38,23 @@ class ReadbackTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             readback_check.compare({}, {"Id": "001"})
 
-    def test_gmail_rejects_added_copy_recipients_and_incomplete_proposal(self):
+    def test_email_rejects_added_copy_recipients_and_incomplete_proposal(self):
         proposal = {"to": "jane@example.com", "subject": "Question", "body": "Hello"}
-        self.assertEqual("match", readback_check.compare(proposal, {**proposal, "id": "d1", "cc": []}, gmail=True)["verdict"])
+        self.assertEqual("match", readback_check.compare(proposal, {**proposal, "id": "d1", "cc": [], "bcc": []}, email=True)["verdict"])
         for field in ("cc", "bcc", "CC", "Bcc"):
             for value in (["extra@example.com"], "extra@example.com", None):
-                self.assertEqual("mismatch", readback_check.compare(proposal, {**proposal, field: value}, gmail=True)["verdict"])
+                self.assertEqual("mismatch", readback_check.compare(proposal, {**proposal, field: value}, email=True)["verdict"])
         with self.assertRaises(ValueError):
-            readback_check.compare({"to": "jane@example.com"}, proposal, gmail=True)
+            readback_check.compare({"to": "jane@example.com"}, proposal, email=True)
 
     def test_cli_match_mismatch_and_bad_input(self):
         with tempfile.TemporaryDirectory() as directory:
             expected = Path(directory) / "expected.json"
             actual = Path(directory) / "actual.json"
-            expected.write_text(json.dumps({"WhoId": "003A"}))
-            for contents, code, verdict in [('{"WhoId":"003A"}', 0, "match"),
+            expected.write_text(json.dumps({"contact_id": "003A"}))
+            for contents, code, verdict in [('{"contact_id":"003A"}', 0, "match"),
                                             ('{}', 1, "mismatch"),
-                                            ('{"WhoId":NaN}', 2, "error")]:
+                                            ('{"contact_id":NaN}', 2, "error")]:
                 actual.write_text(contents)
                 result = subprocess.run([sys.executable, str(SCRIPTS / "readback_check.py"),
                                          "--expected", str(expected), "--actual", str(actual)],

@@ -46,8 +46,10 @@ def verdict(outs):
         b = o.get("bundle")
         if not isinstance(b, dict):
             return {"outcome": "unusable", "reason": "qualified_bundle_not_object", "signal": n}
-        if b.get("classification") != "active_initiative" or b.get("relevance") != "employee_use":
-            return {"outcome": "unusable", "reason": "qualified_bundle_without_active_employee_use", "signal": n}
+        if b.get("classification") != "active_initiative" or b.get("relevance") != "relevant_to_offer":
+            return {"outcome": "unusable", "reason": "qualified_bundle_without_active_relevant_to_offer", "signal": n}
+        if not isinstance(b.get("fit_reason"), str) or not b["fit_reason"].strip():
+            return {"outcome": "unusable", "reason": "qualified_bundle_without_fit_reason", "signal": n}
         tier = b.get("tier")
         if not isinstance(tier, str) or tier not in TIER_ORDER:
             return {"outcome": "unusable", "reason": "qualified_bundle_without_tier", "signal": n}

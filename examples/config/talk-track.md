@@ -2,22 +2,21 @@
 review_by: '2030-01-01'
 verify_before_action: true
 ---
-# Example messaging (fictional)
+
+# Fictional example messaging
 
 ## Core messaging
-Example Research helps teams compare sources and draft research briefs.
-This fictional example is not an approved offer for live outreach.
+
+Example Offer helps organizations plan and deliver reviewed business projects. This sentence is fictional scaffolding, not an approved claim for live outreach.
 
 ## Match the angle
-| Observed work and responsibility | Possible angle | Question |
-|---|---|---|
-| A research lead is evaluating an internal workflow | Source comparison | Which sources would the team need to compare? |
-| A team is formalizing its review process | Reviewed drafts | Who reviews the finished brief? |
+
+Connect a verified buyer initiative to one supported capability or deliverable. State why the recipient's evidenced responsibility makes that connection relevant. A product, physical offering or service can use this structure; the offer and its business model are supplied during setup.
 
 ## Supporting evidence
-Setup records each externally usable assertion, its source quote, attribution,
-limits, and naming permission in sources.json. The example has no approved evidence.
+
+Setup records every substantive assertion's source quotation, attribution, scope, limits and naming permission in sources.json. Replace this example with the actual reviewed offer and evidence.
 
 ## Claim boundaries
-No guaranteed accuracy, cost savings, integration access, or adoption claims.
-Treat proposed benefits as questions until supported. An angle does not prove fit.
+
+Do not promise outcomes, savings, accuracy, availability, integrations or delivery terms without appropriate support. Do not assume a buyer has a problem merely because it is pursuing an initiative. Customer names and results require permission and correct attribution.

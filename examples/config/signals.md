@@ -6,129 +6,99 @@ admission:
   warehouse_max_counted: 1
 tiers:
   tier1:
-  - id: ai_exec_appointment
+  - id: relevant_leader_appointment
     freshness_days: 90
-  - id: public_ai_initiative
+  - id: announced_initiative
     freshness_days: 60
-  - id: ai_rfp_or_procurement
+  - id: relevant_procurement
     freshness_days: 45
-  - id: earnings_ai_commitment
+  - id: funded_priority
     freshness_days: 90
-  - id: incumbent_standardization
+  - id: supplier_standardization
     freshness_days: 120
-  - id: ai_governance_formalization
+  - id: operating_change
     freshness_days: 90
   tier2:
-  - id: ai_hiring_cluster
+  - id: relevant_hiring_cluster
     freshness_days: 30
-  - id: exec_ai_statements
+  - id: leader_priority_statement
     freshness_days: 60
-  - id: ai_vendor_partnership
+  - id: relevant_partnership
     freshness_days: 90
-  - id: ai_earmarked_funding
+  - id: earmarked_investment
     freshness_days: 120
   - id: paid_individuals_present
     freshness_days: 1
     source: workflows/signal-prospector/adoption_territory.sql
   tier3:
-  - id: generic_ai_marketing
+  - id: generic_marketing
   - id: single_job_post
   - id: industry_trend_mention
   - id: discovery_only
 ---
 
-# Fictional example signals
+# Fictional example buying signals
 
-This fictional AI research example illustrates the workflow. Setup replaces its business choices; it is not approved live configuration.
-
-**Find evidence that a company is planning, funding, hiring for, testing, deploying, or expanding AI.** Search broadly, identify the actual initiative, and connect it to a relevant person and potential Example Research use case.
-
-A signal establishes a reason to investigate. It does not establish pain, available budget, purchase intent, or permission to contact an account.
+Configure signals around the buyer's work and this offer. These neutral examples are starting points, not evidence that every appointment, hiring event or funding round is relevant. Setup must choose and define the applicable signals, freshness windows, qualification thresholds and example search queries.
 
 ## Signals to look for
 
 | Signal | Where to look | Evidence to capture |
 |---|---|---|
-| **Dedicated AI hiring** | Company careers pages and job boards | Roles responsible for AI adoption, enablement, transformation, internal agents, or tool evaluation. One substantive posting can identify an initiative; multiple openings add context. |
-| **AI responsibilities in ordinary roles** | Sales, marketing, finance, operations, and HR job descriptions | Responsibility for introducing AI into the team's work, automating a process, or training colleagues. Familiarity with an AI tool alone is a weaker clue. |
-| **New AI leadership or team** | Appointment announcements, leadership pages, LinkedIn | An AI leader, transformation office, center of excellence, or implementation team with a stated mandate. |
-| **Announced AI initiatives** | Press releases, company blogs, strategy updates | Programs, pilots, tool evaluations, standardization, or rollouts. Capture any named team, owner, workflow, investment, partner, or timeline; a stated budget is not required. |
-| **Executive commitments** | Earnings calls, investor presentations, annual reports, interviews | Plans to invest in AI, change workflows, improve productivity, or expand adoption. Retain specific intent even when tools and workflows are not yet disclosed. |
-| **Employee and leader posts** | Public LinkedIn posts, conference talks, podcasts | Firsthand accounts of implementing tools, running pilots, building workflows, or training colleagues. Record the speaker's role and the scope they actually describe. |
-| **Training and adoption programs** | Company posts, events, careers pages | AI academies, training cohorts, champion networks, workshops, hackathons, or adoption targets connected to company work. |
-| **Vendor and consulting engagements** | Customer stories, partner announcements, implementation case studies | A named company evaluating or implementing AI with a vendor or services partner. Identify the project scope and distinguish implementation from resale or distribution. |
-| **Procurement and budget activity** | RFPs, RFIs, procurement portals, public budgets | Funding or evaluation of AI assistants, enterprise search, knowledge tools, agents, or implementation services. Capture requirements, deadlines, and the responsible team. |
-| **Internal technical investment** | Engineering blogs, technical talks, job descriptions | Internal assistants, enterprise search, knowledge retrieval, AI integrations, or shared model infrastructure connected to actual company work. |
-| **Governance and organizational readiness** | Company policies, committee announcements, governance hiring | Establishing approved tools, employee-use policies, review processes, or ownership for AI adoption. Governance activity alone does not establish a purchase. |
-| **Expansion, results, or implementation problems** | Earnings updates, customer stories, executive posts | Moving beyond a pilot, adding departments, reporting adoption, or discussing specific cost, quality, integration, or adoption challenges. Preserve the company's attribution for claimed results. |
+| Announced project or change | Company announcements, project pages, public reporting | Specific initiative, stage, scope, owner and timing |
+| New responsibility | Leadership announcements, role descriptions, public posts | Named person and a mandate related to the offer |
+| Procurement or supplier evaluation | RFPs, tender notices, purchasing pages | Relevant requirement, buying entity, deadline and evaluation owner |
+| Hiring for delivery | Careers pages and substantive job descriptions | Work the role will deliver, not merely a skill keyword |
+| Investment or budget | Company statements, investor materials, public budgets | Funding explicitly linked to a relevant initiative |
+| Expansion or operating change | Location announcements, service launches, partner news | Work created by the change and the team accountable for it |
+| Stated need or implementation experience | Firsthand posts, interviews, customer stories | Attributed problem, intent or activity within the speaker's actual scope |
 
-Search both company sources and relevant public reporting. AI references in careers pages, press releases, and earnings materials are worth inspecting even when the headline does not announce an AI program.
+Search with the configured offer's buyer terminology. Example query shapes: company name plus initiative terms; relevant problem plus procurement or hiring; executive name plus the responsibility being researched. Read full sources; snippets only locate evidence.
 
 ## Interpret the evidence
 
-| Classification | Meaning | Example |
-|---|---|---|
-| **Active initiative** | Concrete evidence of current funding, hiring for delivery, evaluation, implementation, or expansion. State the actual stage. | A role tasked with delivering the company's AI adoption plan; a department testing an assistant. |
-| **Early indication** | Specific interest or intent; execution is unclear. | A CFO announces plans to invest in AI productivity without describing an implementation. |
-| **General mention** | AI commentary or marketing without an identifiable company action. | “AI is transforming our industry”; a job requiring familiarity with ChatGPT. |
+- **active_initiative:** A specific, current project, evaluation, purchase, implementation or expansion. Describe the actual stage; hiring does not establish deployment.
+- **early_indication:** A specific intent or possible need whose execution remains unclear.
+- **general_mention:** Commentary or marketing without a specific company action.
 
-Judge the substance, not the number of mentions. **One detailed job posting can establish hiring for an initiative.** It does not establish that the initiative is already deployed. A cluster of vague postings does not fix missing substance.
+## Decide relevance to the offer
 
-Search snippets help locate evidence; read the full source before classifying it. Attribute employee observations and vendor claims to their speakers rather than treating them as company-wide commitments.
+- **relevant_to_offer:** The evidenced work is within the configured offer's scope. State a `fit_reason` connecting the source to an explicit offer capability or deliverable and its limits.
+- **outside_offer:** The source describes work the configured offer does not support. Report the finding without an outreach handoff.
+- **unclear:** More research is needed to establish fit.
 
-## Identify Example Research relevance
-
-Capture customer-facing initiatives as well as internal ones. Label each finding:
-
-- **Employee use:** AI for research, analysis, company knowledge, documents, reporting, or operational workflows. Find the initiative owner or affected team leader.
-- **Customer-facing product/API:** AI embedded in the company's product or customer experience. Find the product or technical owner and assess the research/API opportunity separately.
-- **Unclear:** AI activity is evident, but its users or purpose need further research.
-
-A company selling AI may also adopt AI internally; establish each separately. An incumbent rollout does not imply dissatisfaction. Ordinary funding, acquisitions, or expansion provide context unless the evidence explicitly connects them to an AI initiative.
+An initiative can serve employees, customers, partners or physical operations. Its audience alone does not decide fit. The same source may be relevant to one offer and outside another. Do not infer pain, dissatisfaction, budget, purchase intent or authority from a signal. Qualification requires both an active initiative and evidenced offer relevance; code checks the stated judgment, not its semantic truth.
 
 ## Check whether the initiative is current
 
-Record the source date and when it was checked. Verify whether the job remains open, the procurement window remains active, or the program is still being implemented or expanded. An older announcement can remain relevant when current evidence supports it. Mark missing dates or unresolved status as unknown; do not invent recency.
-
-Count one underlying initiative once, even when several outlets or posts cover it. Preserve updates that show a change in its stage or scope.
-
-## Verified Example Research adoption and spend
-
-These require authorized, privacy-checked warehouse results; public mentions cannot substitute for the account-level checks.
-
-| Result | Meaning and use |
-|---|---|
-| **Paid individual adoption** | Paid individuals are present and no organizational subscription is mapped to the account. Use the prior completed daily snapshot, within **1 day**. Permitted statement: **“People at the organization already pay for Example Research individually.”** |
-| **Organizational adoption** | Permitted statement: **“Example Research is already adopted at the organization.”** Adds context; it does not independently establish an outreach opportunity. |
-| **Growing organizational self-serve spend** | Verified positive growth over **30 days**, with complete daily coverage. Use the separate spend-growth workflow, billing contact, and fixed approved email. |
-| **No adoption found** | Make no adoption claim. An empty result is not proof of absence; account mapping may be incomplete. |
-
-Do not infer a champion's identity, personal payment, unsanctioned use, or company disapproval. Never expose individual adoption identities, user emails, user or seat counts, queries, or usage timing. Spend figures stay out of prospect messages.
-
-## Record and use findings
-
-Keep **account · initiative and stage · owner or team · evidence classification · source URL, supporting quote, and dates · Example Research relevance**. Mark unknowns explicitly and separate observed facts from proposed use cases.
-
-Retain useful discovery evidence even when it does not meet an automated qualification threshold. These classifications do not override the live workflows' qualification, freshness, ownership, open-Opportunity, recent-contact, or approval checks. Discovery and permission to act remain separate.
+Record the source date and check time. Verify open roles, procurement windows and continuing implementation. Use the frontmatter freshness window for each configured signal. Missing dates or uncertain status remain unknown. Count one underlying initiative once, even if several sources repeat it.
 
 ## Qualification for automated workflows
 
-The search categories above describe what to investigate. The identifiers below preserve the existing automated qualification rules. They are not persona or messaging mappings. Use `discovery_only` for useful findings that do not meet one of these definitions. Early indications, general mentions, customer-facing/API initiatives, and unclear relevance remain reportable but do not enter the employee-outreach or claim handoff. A single substantive job can prove an active initiative while remaining discovery-only under the current hiring threshold.
+The definitions below are fictional examples and must be tailored during setup. A signal identifier is a label, not an independent proof of the definition.
 
-For an employee-use finding, select a qualifying identifier only when the source meets its definition, then apply the frontmatter freshness window. Classification and relevance belong to each finding, not to its search category.
-
-| Identifier | Evidence required in addition to active initiative and employee use |
+| Identifier | Evidence needed, in addition to active initiative and offer fit |
 |---|---|
-| `ai_exec_appointment` | A named executive appointment with AI in the mandate (Chief AI Officer, VP/Head of AI, Head of GenAI programs) announced by the company or credible press. |
-| `public_ai_initiative` | A company-announced AI program with at least one concrete element: budget, timeline, named workflow, or named business unit. |
-| `ai_rfp_or_procurement` | A public RFP, RFI, or procurement notice for AI tooling, enterprise search, or research/knowledge tooling. |
-| `earnings_ai_commitment` | An earnings-call or investor-day commitment to deploy AI in a named internal workflow (not product roadmap AI features). |
-| `incumbent_standardization` | An announced or reported standardization on an AI tool for employees. Do not infer dissatisfaction or gaps. |
-| `ai_governance_formalization` | A published AI usage policy, governance committee, or responsible-AI framework, signaling the company is moving from ad hoc AI use to sanctioned tooling. |
-| `ai_hiring_cluster` | Two or more simultaneously open AI-adjacent roles (AI enablement, prompt engineering, AI program manager, ML platform) at one company. |
-| `exec_ai_statements` | A named executive publicly discussing evaluating or adopting AI tooling (interview, keynote, podcast, LinkedIn), specific enough to name a problem or workflow. |
-| `ai_vendor_partnership` | An announced partnership or pilot with an AI vendor or systems integrator for internal use cases. |
-| `ai_earmarked_funding` | A funding round, budget line, or capital allocation explicitly earmarked for AI capability building. |
-| `paid_individuals_present` | The privacy-checked warehouse result described above; never a public-web substitute. |
+| `relevant_leader_appointment` | A named appointment with an explicit mandate related to the configured offer |
+| `announced_initiative` | A company-announced project with a concrete timeline, workflow, location, team or budget |
+| `relevant_procurement` | A procurement or evaluation notice whose requirements match the offer |
+| `funded_priority` | A specific commitment of resources to relevant work |
+| `supplier_standardization` | An actual supplier or operating-standard decision relevant to the offer; do not infer dissatisfaction |
+| `operating_change` | A specific operating-process, policy or responsibility change creating relevant work |
+| `relevant_hiring_cluster` | Two or more current roles delivering the same relevant initiative; one substantive role can still be useful discovery |
+| `leader_priority_statement` | A named leader describing a specific relevant need, evaluation or implementation |
+| `relevant_partnership` | A partnership or pilot with a demonstrated connection to the buyer's own relevant project |
+| `earmarked_investment` | Investment explicitly assigned to relevant work, rather than a general funding announcement |
+| `paid_individuals_present` | Optional subscription-module evidence only, under the privacy and warehouse rules below |
 
-Tier 3 identifiers (`generic_ai_marketing`, `single_job_post`, `industry_trend_mention`, `discovery_only`) never qualify. For new-account claims, the frontmatter admission thresholds and warehouse pairing still apply; a named-account scan uses its existing one-qualified-signal rule. Neither verdict is approval to write.
+Tier 3 labels (`generic_marketing`, `single_job_post`, `industry_trend_mention`, `discovery_only`) do not qualify. Named-account scans may hand off one qualified signal. New-account claims use the configured admission thresholds and distinct-initiative rule. Neither result authorizes a write.
+
+## Optional subscription evidence
+
+Use this section only when the seller's business has individual and organizational subscriptions and the corresponding module is enabled. Otherwise leave these paths disabled and make no adoption or spend claim.
+
+Account adoption, paid-individual presence and growing organizational recurring revenue require authorized, complete warehouse reads using reviewed mappings. Public mentions do not substitute. Permitted adoption wording comes only from the installed policy. Individual identity, counts, query content and usage timing must not be exposed. ARR and billing-source details remain internal. Empty results do not prove absence.
+
+## Record and use findings
+
+Keep account, initiative/stage, owner or team, classification, relevance, fit reason, full-source URL, exact quote and dates. Retain discovery-only evidence and state why it does not qualify. Distinguish observed facts from proposed uses of the offer.

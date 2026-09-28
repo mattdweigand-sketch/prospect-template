@@ -11,7 +11,8 @@ receipt.json
      "source_url": str, "published_date": "YYYY-MM-DD"|null, "quote": str,
      "evidence_subject": str, "signal_type": str, "quote_speaker": "account"|"third_party",
      "classification": "active_initiative"|"early_indication"|"general_mention",
-     "relevance": "employee_use"|"customer_product"|"unclear",
+     "relevance": "relevant_to_offer"|"outside_offer"|"unclear",
+     "fit_reason": str,  # evidence-to-offer reasoning for human review, not proof of fit
      "event_date": "YYYY-MM-DD" (required only when published_date is null)}
     published_date null means a live first-party page with no trustworthy publication date. The page must
     then name a dated event: event_date must appear in the page text in a common written form. Freshness is
@@ -25,15 +26,15 @@ receipt.json
     quote_speaker "account" means the account or a named alias said or wrote the quote. "third_party" means
     someone else (vendor, reporter) paraphrased them.
 
-Checks. Active initiative and employee use required for qualification; other findings remain in the research report. Required keys present. account_aliases is a list. source_url is http(s). quote_speaker is account or
+Checks. Active initiative, offer relevance and a stated fit reason required for qualification; other findings remain in the research report. Required keys present. account_aliases is a list. source_url is http(s). quote_speaker is account or
 third_party. quote has at least policy scan.quote_min_words words and appears verbatim in the page text (whitespace
 and curly quotes normalized). evidence_subject is account_name or a declared alias. signal_type is a tier1 or tier2
-id in the taxonomy whose entry names no non-web `source` (paid_individuals_present comes from Snowflake through
+id in the taxonomy whose entry names no non-web `source` (paid_individuals_present comes from the optional warehouse module through
 signal-user-scan, never from a page). The governing date is ISO, not in the future (exit 2), and within that signal
 type's freshness_days (else exit 1, stale). Today is the identity.timezone date. A date is future only when it is
 after both that date and the UTC date at read time, so a page dated today in UTC still passes late in the Pacific
 evening. Age counts from the identity.timezone date. Qualified bundles carry "warnings":
-["third_party_paraphrase"] when quote_speaker is third_party and signal_type is exec_ai_statements.
+["third_party_paraphrase"] when quote_speaker is third_party for every signal type.
 
 Qualified bundles carry checked_on (date) and checked_at (timestamp with timezone offset, the moment of the read).
 outreach_gate.py measures bundle age from checked_at. --now replays a read at a given moment, tests only. It must
@@ -53,7 +54,7 @@ from urllib.parse import unquote
 import common
 
 REQUIRED = ("account_name", "account_aliases", "account_domain", "source_url",
-            "published_date", "quote", "evidence_subject", "signal_type", "quote_speaker", "classification", "relevance")
+            "published_date", "quote", "evidence_subject", "signal_type", "quote_speaker", "classification", "relevance", "fit_reason")
 SPEAKERS = ("account", "third_party")
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September",
           "October", "November", "December")
@@ -141,11 +142,13 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
         return 1, {"outcome": "no_usable_signal", "reason": "evidence_subject_not_account_owned",
                    "evidence_subject": receipt["evidence_subject"]}
 
+    if not isinstance(receipt.get("fit_reason"), str) or not receipt["fit_reason"].strip():
+        return 2, {"outcome": "unusable", "reason": "fit_reason_required"}
     if receipt["classification"] not in ("active_initiative", "early_indication", "general_mention"):
         return 2, {"outcome": "unusable", "reason": "invalid_classification"}
-    if receipt["relevance"] not in ("employee_use", "customer_product", "unclear"):
+    if receipt["relevance"] not in ("relevant_to_offer", "outside_offer", "unclear"):
         return 2, {"outcome": "unusable", "reason": "invalid_relevance"}
-    if receipt["classification"] != "active_initiative" or receipt["relevance"] != "employee_use":
+    if receipt["classification"] != "active_initiative" or receipt["relevance"] != "relevant_to_offer":
         return 1, {"outcome": "no_usable_signal", "reason": "discovery_only",
                    "classification": receipt["classification"], "relevance": receipt["relevance"]}
 
@@ -195,7 +198,7 @@ def grade(receipt, page_text, scan_policy, types, today, checked_at=None):
     bundle.update({"tier": signal["tier"], "date_basis": date_basis, "checked_on": today.isoformat(),
                    "checked_at": checked_at.isoformat(timespec="seconds"), "gate": "evidence_gate"})
     warnings = []
-    if receipt["quote_speaker"] == "third_party" and receipt["signal_type"] == "exec_ai_statements":
+    if receipt["quote_speaker"] == "third_party":
         warnings.append("third_party_paraphrase")
     if warnings:
         bundle["warnings"] = warnings

@@ -1,6 +1,6 @@
 ---
 name: signal-arr-growth
-description: Identify self-serve customer accounts with growing ARR and propose fixed-template Gmail drafts. Use for the Prospect spend-growth outreach workflow.
+description: Identify self-serve customer accounts with growing ARR and propose fixed-template email drafts. Use for the Prospect spend-growth outreach workflow.
 ---
 
 # Signal ARR growth

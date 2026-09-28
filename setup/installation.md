@@ -41,7 +41,7 @@ python3 scripts/preflight.py signal-scan
 
 This checks active approval hashes, current source/configuration validity, module selection, and declared capabilities. Then verify actual tool availability and complete authorized live reads. No endpoint, token, scope or capability is inferred from a checked-in mapping. Put credentials in the provider's normal connection mechanism, never a repository file. An optional project `.codex/config.toml` is only added after a real MCP setup is known; this template does not invent one.
 
-The three SQL files are fictional interface examples, not deployed schema. For each enabled warehouse branch, create a reviewed private `.local/queries/` copy, map actual tables/columns and semantics, record its SHA in policy, verify parameter binding and allowed result fields, and perform authorized read-only compatibility checks. A schema name replacement alone is insufficient. Data dates follow the configured identity time zone; the source must use the same daily boundary.
+The three SQL files are fictional interface examples, not deployed schema. Read `setup/subscription-interface.md` for the public view contract and business-model requirements. For each enabled warehouse branch, create a reviewed private `.local/queries/` copy, map actual tables/columns and semantics, record its SHA in policy, verify parameter binding and allowed result fields, and perform authorized read-only compatibility checks. A schema name replacement alone is insufficient. Data dates follow the configured identity time zone; the source must use the same daily boundary.
 
 ## Refresh and recovery
 

@@ -1,10 +1,1 @@
-# Example voice (fictional)
-
-Hi Jordan,
-
-I saw your team is reviewing its research process. Which sources would you want a research brief to bring together?
-
-Best,
-Seller
-
-Replace this with a user-supplied or approved sample during setup.
+Hi Jordan, I saw the project your team announced. The work you described may be relevant to our offer. Would a short example be useful?

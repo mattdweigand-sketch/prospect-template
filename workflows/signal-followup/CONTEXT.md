@@ -1,4 +1,4 @@
-# Log one proven send as an open Salesforce Task
+# Log one proven send as an open CRM Task
 
 ## Inputs
 
@@ -6,7 +6,7 @@
 |---|---|---|
 | Reference | `../../.local/config/policy.yaml` | identity, approval, followup |
 | Tool | `followup_gate.py`; `../../_shared/scripts/readback_check.py` | Task packet validation and approved-field readback |
-| Working | Live Gmail sent-mail proof; Salesforce Account, Contact and Task reads; outreach verdict in this thread | Historical angle/unit labels remain valid; use arr_growth mode only for a demonstrated ARR-growth send |
+| Working | Live email provider sent-mail proof; CRM Account, Contact and Task reads; outreach verdict in this thread | Historical angle/unit labels remain valid; use arr_growth mode only for a demonstrated ARR-growth send |
 
 ## Process
 
@@ -14,7 +14,7 @@ Follow `procedure.md`: prove the send, resolve the Account and Contact, check du
 
 ## Output
 
-One numbered Task proposal; after approval, one Salesforce Task read back by Id. Nothing is written to this folder.
+One numbered Task proposal; after approval, one CRM Task read back by Id. Nothing is written to this folder.
 
 ## Human check
 
@@ -22,4 +22,4 @@ Approve exact Task fields. Changing a field, recipient or sent message requires 
 
 ## Next
 
-None. Salesforce holds the record.
+None. CRM holds the record.

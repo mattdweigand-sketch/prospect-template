@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check one follow-up packet and emit the exact Salesforce Task to propose. signal-followup calls this once per send.
+"""Check one follow-up packet and emit canonical task fields to map and propose. signal-followup calls this once per send.
 
 Usage:
     python3 workflows/signal-followup/followup_gate.py --packet packet.json [--mode standard|arr_growth] [--today YYYY-MM-DD]
@@ -7,11 +7,11 @@ Usage:
 
 packet.json
     {
-      "sent": [ {"message_id": "...", "thread_id": "...", "subject": "...", "sent_at": "<aware ISO-8601>", "to": "x@acme.example"} ],   # live Gmail in:sent hits
-      "account": {"id": "001...", "owner_id": "005..."},
-      "contacts": [ {"id": "003...", "email": "x@acme.example"} ],                # Contacts on the Account whose Email matches the recipient
-      "tasks": [ {"id": "00T...", "subject": "...", "description": "...", "status": "Not Started"} ],  # existing Tasks on the Contact, any status
-      "signal": {"signal_type": "ai_exec_appointment", "angle": "Model flexibility"}   # from the outreach gate allow verdict in the thread. angle is the approved rationale label. arr_growth mode: both arr_growth
+      "sent": [ {"message_id": "...", "is_sent": true, "thread_id": "...", "subject": "...", "sent_at": "<aware ISO-8601>", "to": "x@acme.example"} ],   # live native messages with confirmed sent state
+      "account": {"id": "account-123", "owner_id": "owner-123"},
+      "contacts": [ {"id": "contact-123", "email": "x@acme.example"} ],                # Contacts on the Account whose Email matches the recipient
+      "tasks": [ {"id": "task-123", "subject": "...", "description": "...", "status": "Not Started"} ],  # existing Tasks on the Contact, any status
+      "signal": {"signal_type": "relevant_leader_appointment", "angle": "Implementation support"}   # from the outreach gate allow verdict in the thread. angle is the approved rationale label. arr_growth mode: both arr_growth
     }
 
 Checks, in order. Every failing check names its reason. Checks 1 through 6 all run before the verdict. Check 7 runs
@@ -20,12 +20,12 @@ only when they pass.
     2. signal: signal_type and angle are nonempty historical labels from the approved outreach verdict, or both
        arr_growth in arr_growth mode. They land in Description. Do not revalidate a sent message against a
        subsequently edited content catalog. Legacy unit labels from existing sent messages are accepted
-    3. sent fields: the hit carries message_id, thread_id, subject, sent_at, to. Each missing key is its own reason
-    4. owner: account.owner_id equals identity.sfdc_user_id
+    3. sent fields: the hit carries message_id, subject, sent_at, to and native is_sent=true. thread_id is optional
+    4. owner: account.owner_id equals identity.crm_user_id
     5. contact: exactly one contact with a nonempty string id, email equals sent.to case-insensitively
     6. duplicate: tasks must be a list (the live Task read, empty when the Contact has none). A missing or null
        tasks field blocks. No task whose subject equals the proposed Subject, whose description contains the
-       message id, or which is open with a subject starting with the followup.task.Subject prefix ("Follow up:")
+       message id, or which is open with a subject starting with the followup.task.subject prefix ("Follow up:")
     7. due date: sent_at is an aware timestamp not after now. identity.timezone send date + followup.due_calendar_days, or
        + arr_growth_due_business_days weekdays in arr_growth mode. Blocks when the due date is before today
        (--today overrides both today and now)
@@ -69,8 +69,8 @@ def check(packet, mode, policy, today=None, now=None, shared=SHARED):
     sent = packet.get("sent") or []
     acct = packet.get("account")
     if not isinstance(sent, list):
-        raise ValueError("sent must be a list of Gmail in:sent hits")
-    if not isinstance(acct, dict) or not acct.get("id"):
+        raise ValueError("sent must be a list of native sent-message records")
+    if not isinstance(acct, dict) or not common.opaque_id(acct.get("id")):
         raise ValueError("account must be an object with id and owner_id")
     if len(sent) == 0:
         return {"verdict": "block", "reasons": ["no sent proof"]}
@@ -88,12 +88,17 @@ def check(packet, mode, policy, today=None, now=None, shared=SHARED):
                 reasons.append(f"signal {label} must be a nonempty label from the approved outreach verdict")
     if not isinstance(s, dict):
         raise ValueError("sent hit must be an object")
-    for k in ("message_id", "thread_id", "subject", "sent_at", "to"):
+    for k in ("message_id", "subject", "sent_at", "to"):
         if not s.get(k):
             reasons.append(f"sent hit missing {k}")
 
-    if acct.get("owner_id") != policy["identity"]["sfdc_user_id"]:
-        reasons.append("account owner is not identity.sfdc_user_id")
+    if s.get("is_sent") is not True:
+        reasons.append("native sent state is not confirmed")
+    if not common.opaque_id(s.get("message_id")):
+        reasons.append("sent message_id must be an opaque ID")
+
+    if acct.get("owner_id") != policy["identity"]["crm_user_id"]:
+        reasons.append("account owner is not identity.crm_user_id")
 
     contacts = packet.get("contacts") or []
     if not isinstance(contacts, list):
@@ -109,8 +114,8 @@ def check(packet, mode, policy, today=None, now=None, shared=SHARED):
         if (contact.get("email") or "").lower() != (s.get("to") or "").lower():
             reasons.append("contact email does not equal recipient")
 
-    subject = fp["task"]["Subject"].format(gmail_subject=s.get("subject") or "")
-    prefix = fp["task"]["Subject"].split("{")[0].strip()
+    subject = fp["task"]["subject"].format(email_subject=s.get("subject") or "")
+    prefix = fp["task"]["subject"].split("{")[0].strip()
     tasks = packet.get("tasks")
     if not isinstance(tasks, list):
         reasons.append("tasks missing or not a list. Read the Contact's Tasks and pass the list, empty when there are none")
@@ -141,15 +146,15 @@ def check(packet, mode, policy, today=None, now=None, shared=SHARED):
         return {"verdict": "block", "reasons": [f"due date {due.isoformat()} is before today. Send is older than the follow-up window"]}
 
     task = {
-        "Subject": subject,
-        "WhatId": acct["id"],
-        "WhoId": contacts[0]["id"],
-        "OwnerId": policy["identity"]["sfdc_user_id"],
-        "Status": fp["task"]["Status"],
-        "Priority": fp["task"]["Priority"],
-        "TaskSubtype": fp["task"]["TaskSubtype"],
-        "ActivityDate": due.isoformat(),
-        "Description": fp["task"]["Description"].format(message_id=s["message_id"], thread_id=s["thread_id"],
+        "subject": subject,
+        "account_id": acct["id"],
+        "contact_id": contacts[0]["id"],
+        "owner_id": policy["identity"]["crm_user_id"],
+        "status": fp["task"]["status"],
+        "priority": fp["task"]["priority"],
+        "subtype": fp["task"]["subtype"],
+        "due_date": due.isoformat(),
+        "description": fp["task"]["description"].format(message_id=s["message_id"], thread_id=s.get("thread_id") or "unavailable",
                                                         signal_type=stype, unit=unit),
     }
     return {"verdict": "allow", "mode": mode, "task": task}

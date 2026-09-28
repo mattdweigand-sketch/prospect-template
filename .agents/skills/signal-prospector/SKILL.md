@@ -1,6 +1,6 @@
 ---
 name: signal-prospector
-description: Discover net-new enterprise accounts and prepare reviewed Salesforce claims in the Prospect repository. Use when asked to find prospects or claim eligible accounts.
+description: Discover net-new enterprise accounts and prepare reviewed CRM claims in the Prospect repository. Use when asked to find prospects or claim eligible accounts.
 ---
 
 # Signal prospector

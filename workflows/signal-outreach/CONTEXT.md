@@ -9,7 +9,7 @@
 | Reference | `../../.local/config/icp.md` | Relevant Target personas section |
 | Tool | `outreach_gate.py`; `../../_shared/scripts/readback_check.py` | Packet checks and approved-field readback |
 | Tool | `../../scripts/lint_draft.py` | Bundled advisory style review |
-| Working | Qualified bundle in this thread; recipient sources and current Salesforce/Gmail activity reads | No bundle reconstruction from memory or summaries |
+| Working | Qualified bundle in this thread; recipient sources and current CRM/email provider activity reads | No bundle reconstruction from memory or summaries |
 
 ## Process
 
@@ -17,7 +17,7 @@ Follow `procedure.md`: verify the recipient responsibility, choose one angle, ch
 
 ## Output
 
-One numbered proposal in the thread; one Gmail draft after approval and exact readback. Nothing is written to this folder.
+One numbered proposal in the thread; one email draft after approval and exact readback. Nothing is written to this folder.
 
 ## Human check
 

@@ -19,21 +19,21 @@ import arr_growth_gate as ag  # noqa: E402
 import common  # noqa: E402
 
 POLICY = common.load_policy()
-SELLER = POLICY["identity"]["sfdc_user_id"]
-HOUSE = POLICY["salesforce"]["house_owner_ids"][0]
+SELLER = POLICY["identity"]["crm_user_id"]
+HOUSE = POLICY["crm"]["house_owner_ids"][0]
 TODAY = date(2026, 9, 21)
 
 ROW = {
-    "organization_uuid": "org-1", "organization_name": "Acme", "salesforce_account_id": "001A",
+    "organization_uuid": "org-1", "organization_name": "Acme", "crm_account_id": "001A",
     "baseline_arr_usd": 1200.0, "current_arr_usd": 2400.0, "net_change_usd": 1200.0,
     "observed_dates": 31, "required_dates": 31,
     "subscription_platform": "web", "billing_email": "jane@acme.example", "communications_enabled": True,
     "account": {"exists": True, "name": "Acme", "website": "https://acme.example", "owner_id": SELLER, "owner_is_active": True,
-                "open_opportunity_ids": [], "headcount": 1200, "headcount_source": "Account.NumberOfEmployees"},
+                "open_deal_ids": [], "headcount": 1200, "headcount_source": "account.headcount"},
     "contacts": [{"id": "003A", "email": "Jane@Acme.example", "first_name": "Jane"}],
     "last_touch_date": None,
-    "reads": {"account": True, "opportunities": True, "headcount_lookup": True,
-              "contacts": True, "tasks": True, "events": True, "gmail_sent": True},
+    "reads": {"account": True, "deals": True, "headcount_lookup": True,
+              "contacts": True, "tasks": True, "events": True, "email_sent": True},
 }
 
 
@@ -85,7 +85,7 @@ class Allow(unittest.TestCase):
         self.assertEqual(ag.check({"data_through_date": "2026-09-20", "rows": [row()]}, pol, today=TODAY)["held"][0]["hold"], "unsupported_billing_platform")
 
     def test_cap_and_order(self):
-        rows = [row(salesforce_account_id=f"001{i}", current_arr_usd=2200 - i, net_change_usd=1000 - i) for i in range(4)]
+        rows = [row(crm_account_id=f"001{i}", current_arr_usd=2200 - i, net_change_usd=1000 - i) for i in range(4)]
         out = run(*rows)
         self.assertEqual(len(out["selected"]), POLICY["arr_growth"]["max_accounts_per_run"])
         self.assertEqual([s["rank"] for s in out["selected"]], [1, 2])
@@ -124,10 +124,10 @@ class Hold(unittest.TestCase):
         self.assertEqual(self.hold(row(net_change_usd=0)), "no_positive_net_change")
 
     def test_no_account(self):
-        self.assertEqual(self.hold(row(account={"exists": False})), "no_salesforce_account")
+        self.assertEqual(self.hold(row(account={"exists": False})), "no_crm_account")
 
     def test_open_opp(self):
-        self.assertEqual(self.hold(row(account={"open_opportunity_ids": ["006X"]})), "active_deal")
+        self.assertEqual(self.hold(row(account={"open_deal_ids": ["006X"]})), "active_deal")
 
     def test_house_owner(self):
         self.assertEqual(self.hold(row(account={"owner_id": HOUSE})), "claim_transfer")
@@ -189,12 +189,12 @@ class Input(unittest.TestCase):
                 run(row(**changes))
 
     def test_unknown_routing_facts_are_errors(self):
-        for key in ("exists", "owner_is_active", "open_opportunity_ids"):
+        for key in ("exists", "owner_is_active", "open_deal_ids"):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 run(row(account={key: None}))
 
     def test_required_reads_and_headcount_lookup(self):
-        for key in ("account", "opportunities", "contacts", "tasks", "events", "gmail_sent"):
+        for key in ("account", "deals", "contacts", "tasks", "events", "email_sent"):
             with self.subTest(read=key):
                 self.assertEqual(run(row(reads={key: False}))["held"][0]["hold"], f"read_not_completed:{key}")
         self.assertEqual(run(row(reads={"headcount_lookup": False}))["verdict"], "allow")
@@ -203,14 +203,14 @@ class Input(unittest.TestCase):
                              "read_not_completed:headcount_lookup")
 
     def test_held_routes_and_territory_do_not_require_later_reads(self):
-        for facts, reason in (({"open_opportunity_ids": ["006A"]}, "active_deal"),
+        for facts, reason in (({"open_deal_ids": ["006A"]}, "active_deal"),
                               ({"headcount": 50000}, "territory_out")):
             r = row(account=facts)
-            r["reads"] = {"account": True, "opportunities": True}
+            r["reads"] = {"account": True, "deals": True}
             self.assertEqual(run(r)["held"][0]["hold"], reason)
 
     def test_duplicate_account_does_not_consume_another_selection(self):
-        out = run(row(), row(organization_uuid="org-2"), row(salesforce_account_id="001B"))
+        out = run(row(), row(organization_uuid="org-2"), row(crm_account_id="001B"))
         self.assertEqual([s["account_id"] for s in out["selected"]], ["001A", "001B"])
         self.assertEqual(out["held"][0]["hold"], "duplicate_account")
         self.assertEqual(out["shortfall"], 0)
@@ -246,28 +246,30 @@ class Input(unittest.TestCase):
 class Queries(unittest.TestCase):
     ACCOUNT = {"id": "001000000000001AAA", "website": "HTTPS://www.Acme.example/path"}
 
-    def test_fixed_queries_use_account_relationship_domain_and_policy_window(self):
+    def test_read_intents_preserve_relationship_domain_and_policy_window(self):
         result = ag.queries({"accounts": [self.ACCOUNT]}, POLICY, today=TODAY)
         q = result["queries"][0]
         self.assertEqual(result["cutoff_date"], "2026-08-22")
-        self.assertIn("AccountId = '001000000000001AAA' AND ActivityDate >= 2026-08-22", q["tasks"])
-        self.assertIn("TaskSubtype IN ('Email', 'Call')", q["tasks"])
-        self.assertNotIn("Status", q["tasks"])
-        self.assertIn("FROM Event WHERE AccountId = '001000000000001AAA'", q["events"])
-        self.assertNotIn("TaskSubtype", q["events"])
-        self.assertEqual(q["gmail_sent"], "in:sent to:(@acme.example) after:1787381999")
+        self.assertEqual(q["tasks"]["capability"], "crm.query")
+        self.assertEqual(q["tasks"]["filters"], {"account_id":self.ACCOUNT["id"], "date_gte":"2026-08-22", "subtypes":["Email","Call"]})
+        self.assertEqual(q["events"]["filters"], {"account_id":self.ACCOUNT["id"], "date_gte":"2026-08-22"})
+        self.assertEqual(q["email_sent"]["filters"], {"is_sent":True, "recipient_domain":"acme.example", "sent_at_gte":"2026-08-22T00:00:00-07:00"})
         pol = copy.deepcopy(POLICY)
-        pol["outreach"]["suppressing_task_subtypes"] = ["Call"]
-        self.assertIn("TaskSubtype IN ('Call')", ag.queries({"accounts": [self.ACCOUNT]}, pol, TODAY)["queries"][0]["tasks"])
+        pol["outreach"]["suppressing_task_subtypes"] = ["Phone Call"]
+        self.assertEqual(ag.queries({"accounts":[self.ACCOUNT]},pol,TODAY)["queries"][0]["tasks"]["filters"]["subtypes"],["Phone Call"])
 
-    def test_missing_domain_holds_and_query_interpolation_is_constrained(self):
+    def test_missing_domain_holds_and_opaque_ids_remain_data(self):
         for website in (None, "NULL", "user@acme.example", "https://acme.example' OR 1=1", "localhost"):
             with self.subTest(website=website):
                 q = ag.queries({"accounts": [{**self.ACCOUNT, "website": website}]}, POLICY, TODAY)["queries"][0]
                 self.assertEqual(q["hold"], "account_domain_missing")
-                self.assertNotIn("gmail_sent", q)
-        with self.assertRaises(ValueError):
-            ag.queries({"accounts": [{**self.ACCOUNT, "id": "001' OR Id != null"}]}, POLICY, TODAY)
+                self.assertNotIn("email_sent", q)
+        for aid in ("92384", "ca683b7c-bb36-4ed4-8108-94b0efea2ec3", "001' OR Id != null"):
+            q=ag.queries({"accounts":[{**self.ACCOUNT,"id":aid}]},POLICY,TODAY)["queries"][0]
+            self.assertEqual(q["tasks"]["filters"]["account_id"],aid)
+        for aid in ("", " padded ", "bad\nID", 12, True):
+            with self.assertRaises(ValueError):
+                ag.queries({"accounts":[{**self.ACCOUNT,"id":aid}]},POLICY,TODAY)
 
 
 class Cli(unittest.TestCase):

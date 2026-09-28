@@ -1,6 +1,6 @@
 # Prospect template
 
-Research accounts, check the evidence, prepare a reviewed outreach draft, and log a proven send. This is a native Codex repository with eight small skill entry points. Salesforce writes and Gmail drafts require review of their exact fields. You send email yourself.
+Research accounts, check the evidence, prepare a reviewed outreach draft, and log a proven send. This is a native Codex repository with eight small skill entry points. CRM writes and email drafts require review of their exact fields. You send email yourself.
 
 Start with **prospect-setup**. Codex reads your existing materials, asks for missing details, and prepares a configuration for review. You do not need to write YAML or build claim IDs. The checked-in examples are fictional; no live seller identity, provider connection, or customer data is installed.
 
@@ -26,14 +26,16 @@ Native skill discovery is described in the [Codex skills guide](https://learn.ch
 |---|---|
 | `prospect-setup` | Configure or update the business, ICP, messaging, voice and providers |
 | `signal-refresh` | Compare a new source revision and stage a reviewed messaging update |
-| `signal-prospector` | Discover accounts and propose eligible Salesforce claims |
+| `signal-prospector` | Discover accounts and propose eligible CRM claims |
 | `signal-scan` | Research public buying signals for a named account |
 | `signal-user-scan` | Read permitted account-level product adoption, when enabled |
-| `signal-outreach` | Turn a qualified bundle into one approved Gmail draft |
+| `signal-outreach` | Turn a qualified bundle into one approved email draft |
 | `signal-followup` | Turn proof of a sent message into one approved Task |
 | `signal-arr-growth` | Prepare fixed-template drafts for eligible growing self-serve accounts |
 
-The examples describe an AI research offer to illustrate the ZIP's original signal model. Setup can replace the ICP, signal definitions, personas and messaging for another B2B offer, including a service. The `employee_use` relevance label means an initiative used by the buyer's own team; customer-facing product/API work is reported separately. Adoption and ARR are specialized optional modules, not prerequisites for basic public-signal prospecting.
+The starter content is fictional and offer-neutral. Setup defines the user's company, product or service, ICP, responsibilities, buying signals, supported claims, voice, territory and operating values. Public evidence is judged against that configured offer; internal and customer-facing initiatives can both qualify. Subscription adoption and ARR are optional modules, disabled by default.
+
+CRM and email providers are configurable. Setup maps your available tools, record fields, status values and read/write capabilities to common workflow contracts. IDs and query plans are provider-neutral. A connector still needs verified mappings and complete native readback; this template does not bundle a production adapter for every system.
 
 ## Repository map
 
@@ -49,7 +51,7 @@ The examples describe an AI research offer to illustrate the ZIP's original sign
 | `tests/`, `.github/workflows/checks.yml` | Local behavioral checks and CI definition |
 | `docs/BUILD-REPORT.md` | Rebuild provenance, verification and limits |
 
-Operational outputs live in the chat, Gmail and Salesforce. Temporary customer files stay outside the checkout. There is no send tool, automatic provider setup, scheduled runner, or provider credential bundled here. See [installation](setup/installation.md) and [provider contracts](setup/providers.md) for the concrete steps.
+Operational outputs live in the chat, your email provider and CRM. Temporary customer files stay outside the checkout. There is no send tool, automatic provider setup, scheduled runner, or provider credential bundled here. See [installation](setup/installation.md) and [provider contracts](setup/providers.md) for the concrete steps.
 
 ## Maintenance
 

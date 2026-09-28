@@ -14,23 +14,25 @@ The ZIP remains the implementation base for the six operational workflows and th
 
 | Area | Result |
 |---|---|
-| Native entry points | Eight repository skills, 84–93 words each, pointing to one canonical procedure per workflow |
+| Native entry points | Eight repository skills, under 100 words each, pointing to one canonical procedure per workflow |
 | Setup | Read supplied materials first; interview gaps; stage seven complete configuration files and three synthetic fit previews; validate; review exact postimages; apply only the approved bytes |
 | Sources and voice | Full Git commit pins, watched file paths, exact source quotes, attribution, limits and naming permission; permitted snapshots preserve original bytes and extraction provenance |
 | Refresh | Compare committed watched files, identify changes/deletions, stage affected wording and use the same review/application lifecycle |
 | Portability | Fictional examples replace seller IDs and named-account fixtures; private source schemas become explicit SQL interfaces; optional adoption/ARR branches default off |
+| Provider neutrality | Configurable CRM/email systems, canonical account/contact/task/email records, explicit nested field and numeric ID mapping, structured read intents, native sent-state checks and optional thread IDs |
 | Codex runtime | Current capability mapping, pagination/completion rules, local Python setup, repository skill discovery and explicit missing-provider behavior |
 | Outreach checks | Require public gate/source/date fields, separate completed-read receipts from activity rows, bind current Account/recipient facts, and reject unknown Task statuses |
-| Gmail | Preserve draft and message IDs; retrieve and decode complete native content with the correct tool ID; compare exact To/Subject/Body and CC/BCC |
+| Email | Preserve draft and message IDs; retrieve and decode complete native content with the correct tool ID; compare exact To/Subject/Body and CC/BCC |
 | State and recovery | Customer packets remain temporary outside the checkout; setup artifacts are ignored under .local; changed configuration invalidates receipts; an apply lock and backup support local recovery |
 | Maintenance | Bundled advisory style check, dependency pin, repository checker and a GitHub Actions definition |
 
-No model SDK, replacement agent framework or invented provider endpoint is required. The example AI signal taxonomy is configurable. A synthetic supplier-research service uses a different signal identifier through the same gates.
+No model SDK, replacement agent framework or invented provider endpoint is required. No operational configuration or procedure assumes the source vendor, an AI offer, a particular CRM or a particular email provider. Historical source names appear only in the hygiene denylist and deliberate regression fixtures. The buying-signal taxonomy is configurable. A synthetic supplier-research service uses a different signal identifier through the same gates.
 
 ## Verification
 
-- **330 tests passed** on Python 3.9.6 / PyYAML 6.0.3. This includes the 289 inherited test cases, adapted to explicit fictional fixtures, and 41 new cases for setup, refresh, source snapshots and native-read boundaries.
-- The service rehearsal exercises setup → source evidence → scan verdict → Account route → outreach gate → simulated Gmail readback → proven-send follow-up → simulated Task readback. Added BCC and missing sent proof reject the dependent action.
+- **349 tests passed** on Python 3.9.6 / PyYAML 6.0.3. This includes the 289 inherited test cases, adapted to explicit fictional fixtures, and 60 additional cases for setup, refresh, source snapshots, native-read boundaries, business neutrality and provider mapping.
+- The service rehearsal exercises setup → source evidence → scan verdict → Account route → outreach gate → simulated email readback → proven-send follow-up → simulated Task readback. Added BCC and missing sent proof reject the dependent action.
+- Two additional synthetic provider shapes exercise flat versus nested records, numeric versus opaque IDs, explicit status conversions, unsent-draft readback and sent-proof-to-task creation. Tests reject dropped write fields, missing recipient coverage, unknown enums, invalid mappings and changed associations.
 - Setup tests cover changed proposals/reviews/previews/preimages, application reuse, concurrent locks, rollback on install failure, symlink/traversal rejection, local Git replacement refs, source deletion/retirement, source/voice mismatch, optional modules and disconnected providers.
 - All **8 skill files** passed the bundled skill validator. All **32 skill links** resolve within the repository. The public repository checker passes.
 - A clean tracked-file Git export is checked separately for portability; it contains no active .local configuration or source corpus. The full suite and repository check are run from that export before delivery.
@@ -47,12 +49,12 @@ This is an umbrella of independent workflows with shared configuration. The oper
 | Resume operational work | Contract verified; live run not verified | CONTEXT.md: “A missing thread proposal cannot be reconstructed from memory and called approved.” setup/providers.md requires native reconciliation before a retry. No actual provider run was performed. |
 | Router stays small; content has owners | Pass | AGENTS.md contains routing and ownership pointers; installed policy/ICP/signals/talk-track/voice/provider/source files own their respective content. Skills contain links, not copied workflow steps. |
 | Factory versus product | Pass | CONTEXT.md distinguishes ignored setup artifacts from customer bundles in chat and native provider records. No customer operational output is part of this template. |
-| References after rebuild | Pass locally; external consumers not verified | Eight validated skills, 32 resolved links and procedure/path checks. Existing external Perplexity consumers were not pointed at this new repo. |
-| Context size | Pass by approximate character count | Outreach entry/contract/procedure plus relevant policy, persona, voice and provider sections is roughly 7–8k tokens at four characters per token; each pointer is 84–93 words. This is an estimate, not a tokenizer measurement. |
+| References after rebuild | Pass locally; external consumers not verified | Eight validated skills, 32 resolved links and procedure/path checks. Existing external previous-runtime consumers were not pointed at this new repo. |
+| Context size | Pointer size verified | Each pointer remains under 100 words. Full workflow references are loaded when selected; provider contracts grew to document configurable mappings. No total-token budget is claimed. |
 
 ## Limits and first use
 
-The checks establish local mechanics, not source truth, permission, actual user approval, live provider access or delivery. Claim and persona meaning, source coverage, customer naming permission and voice quality need review. SQL checks include static contracts and a SQLite fixture, not Snowflake schema/syntax certification. Provider mappings are declarations, not executable or authenticated adapters; no live tools were called to build this repo. No automated MIME adapter is shipped because the actual connected schemas must determine the mapping.
+The checks establish local mechanics, not source truth, permission, actual user approval, live provider access or delivery. Claim and persona meaning, source coverage, customer naming permission and voice quality need review. SQL checks include static contracts and a SQLite fixture, not Snowflake schema/syntax certification. The record mapping helper executes local structural transformations. Capability declarations still need actual connectors and reviewed query/envelope translations; they are not authenticated production adapters. No live provider tools were called to build this repo. No automated MIME adapter is shipped because the actual connected schemas must determine the mapping.
 
 The GitHub Actions workflow is supplied but has not run remotely. Only Python 3.9.6 was exercised locally; the configured 3.13 CI leg remains unverified. Codex's documented .agents/skills layout is validated, but skill-menu discovery has not been smoke-tested in a newly opened project/chat.
 

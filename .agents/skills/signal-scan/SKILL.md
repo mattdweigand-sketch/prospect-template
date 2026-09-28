@@ -1,6 +1,6 @@
 ---
 name: signal-scan
-description: Research public AI signals for a named account or account list in the Prospect repository. Use for evidence-backed public account scans; internal adoption questions belong to signal-user-scan.
+description: Research public buying signals for a named account or account list in the Prospect repository. Use for evidence-backed public account scans; internal adoption questions belong to signal-user-scan.
 ---
 
 # Signal scan

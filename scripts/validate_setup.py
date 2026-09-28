@@ -15,6 +15,7 @@ import yaml
 import setup_common as sc
 sys.path.insert(0, str(sc.ROOT / '_shared' / 'scripts'))
 import common
+import provider_map
 
 
 def require(value, message):
@@ -49,15 +50,14 @@ def validate(folder, root=sc.ROOT, today=None):
     require(deployment['mode'] == 'configured', 'fictional examples cannot become active configuration')
     for key in ('business_name', 'product_name', 'review_reference'):
         require(text(deployment[key]), 'deployment.' + key + ' needs an actual reviewed value')
-    require('Example Research' not in deployment['product_name'] + deployment['business_name'], 'replace the fictional business')
+    require(not any(marker in deployment['product_name'] + deployment['business_name'] for marker in ('Example Offer','Example Company')), 'replace the fictional business')
     ident = p['identity']
     require(re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+', ident['owner_email']), 'identity.owner_email is invalid')
     require(not ident['owner_email'].endswith(('.test', '.invalid', '@example.com')), 'replace the fictional seller address')
-    require(re.fullmatch(r'005[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?', ident['sfdc_user_id']), 'identity.sfdc_user_id needs a Salesforce User Id')
-    require(ident['sfdc_user_id'] != '005000000000001AAA', 'replace the fictional Salesforce identity')
+    require(common.opaque_id(ident['crm_user_id']) and ident['crm_user_id'] != 'example-owner', 'replace the fictional CRM identity with your opaque native user ID')
     ZoneInfo(ident['timezone'])
     require(p['approval']['unattended_writes'] is False and p['approval']['readback_required'] is True, 'retain approval and readback boundaries')
-    require({'send email', 'create Opportunity', 'change deal stage or amount'} <= set(p['approval']['never']), 'retain prohibited writes')
+    require({'send email', 'create deal', 'change deal stage or amount'} <= set(p['approval']['never']), 'retain prohibited writes')
     require(p['outreach']['max_drafts_per_run'] == 1 and p['followup']['max_tasks_per_run'] == 1, 'outreach and followup are single-proposal workflows')
     require(1 <= p['arr_growth']['max_accounts_per_run'] <= 2, 'ARR workflow supports at most two accounts')
     for section, keys in {'scan':['quote_min_words','max_signals_per_account'], 'outreach':['bundle_checked_max_age_hours','suppression_days','activity_lookback_days'], 'followup':['due_calendar_days','arr_growth_due_business_days'], 'prospector':['max_candidates_per_run','max_people_per_account']}.items():
@@ -66,7 +66,7 @@ def validate(folder, root=sc.ROOT, today=None):
     require(p['outreach']['activity_lookback_days'] >= p['outreach']['suppression_days'], 'activity reads must cover suppression window')
     statuses = p['outreach']['task_status_map']
     require(bool(statuses) and all(text(k) and v in ('completed','open','cancelled') for k,v in statuses.items()), 'task_status_map must classify native statuses')
-    require(statuses.get(p['followup']['task']['Status']) == 'open', 'followup Task status must map to open')
+    require(statuses.get(p['followup']['task']['status']) == 'open', 'followup Task status must map to open')
     require(all(statuses.get(s) in ('completed','cancelled') for s in p['followup']['closed_statuses']), 'closed_statuses must agree with task_status_map')
     require(p['outreach']['talk_track']['file'] == 'talk-track.md' and p['email_voice']['file'] == 'voice.md', 'references must use canonical filenames')
     require(text(p['email_voice']['source_reference']), 'email voice needs a source_reference')
@@ -125,6 +125,9 @@ def validate(folder, root=sc.ROOT, today=None):
         require(isinstance(cap,dict) and set(cap) == set(expected[name]), 'invalid provider mapping: ' + name)
         if cap['tool'] is not None:
             require(all(text(v) for v in cap.values()), 'incomplete provider mapping: ' + name)
+        else:
+            require(all(v is None for v in cap.values()), 'unavailable capability must be entirely null: ' + name)
+    provider_map.validate_catalog(providers)
     enabled = p['user_scan']['enabled'] or p['arr_growth']['enabled'] or p['prospector']['adoption_source']['enabled']
     require(not enabled or p['warehouse']['enabled'], 'adoption and ARR modules require an enabled warehouse')
     if p['warehouse']['enabled']:

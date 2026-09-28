@@ -16,16 +16,16 @@ sys.path.insert(0, str(SCRIPTS))
 import evidence_gate as gate  # noqa: E402
 
 TODAY = date(2026, 9, 21)
-PAGE = ("Acme Corp today announced the appointment of Jane Doe as Chief AI Officer.\n"
-        "\u201cWe will deploy generative AI across every research workflow,\u201d Doe said.")
+PAGE = ("Acme Corp today announced the appointment of Jane Doe as Chief Operating Officer.\n"
+        "\u201cWe will deploy service improvements across every research workflow,\u201d Doe said.")
 
 
 def receipt(**over):
     base = {"account_name": "Acme Corp", "account_aliases": ["Acme", "Jane Doe"], "account_domain": "acme.example",
             "source_url": "https://acme.example/news", "published_date": "2026-09-01",
-            "quote": "appointment of Jane Doe as Chief AI Officer", "evidence_subject": "Acme Corp",
-            "signal_type": "ai_exec_appointment", "quote_speaker": "account",
-            "classification": "active_initiative", "relevance": "employee_use"}
+            "quote": "appointment of Jane Doe as Chief Operating Officer", "evidence_subject": "Acme Corp",
+            "signal_type": "relevant_leader_appointment", "quote_speaker": "account",
+            "classification": "active_initiative", "relevance": "relevant_to_offer", "fit_reason": "The evidenced initiative matches the configured offer and its stated limits."}
     base.update(over)
     return base
 
@@ -44,16 +44,16 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual(out["bundle"]["date_basis"], "published")
 
     def test_quote_with_curly_quotes_and_line_break_matches(self):
-        r = receipt(quote='"We will deploy generative AI across every research workflow," Doe said.',
+        r = receipt(quote='"We will deploy service improvements across every research workflow," Doe said.',
                     evidence_subject="Jane Doe")
         self.assertEqual(self.run_gate(r)[0], 0)
 
     def test_quote_not_in_page(self):
-        code, out = self.run_gate(receipt(quote="Acme is buying Example Research Enterprise next week"))
+        code, out = self.run_gate(receipt(quote="Acme is buying Example Offer Enterprise next week"))
         self.assertEqual((code, out["reason"]), (1, "quote_not_in_page"))
 
     def test_quote_too_short(self):
-        code, out = self.run_gate(receipt(quote="Chief AI Officer"))
+        code, out = self.run_gate(receipt(quote="Chief Operating Officer"))
         self.assertEqual((code, out["reason"]), (1, "quote_too_short"))
 
     def test_subject_not_account_owned(self):
@@ -69,7 +69,7 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual(out["freshness_days"], 90)
 
     def test_tier3_never_qualifies(self):
-        code, out = self.run_gate(receipt(signal_type="generic_ai_marketing"))
+        code, out = self.run_gate(receipt(signal_type="generic_marketing"))
         self.assertEqual((code, out["reason"]), (1, "tier3_never_qualifies"))
 
     def test_undated_page_without_event_date_fails(self):
@@ -97,16 +97,16 @@ class EvidenceGate(unittest.TestCase):
         self.assertEqual((code, out["reason"]), (2, "quote_speaker_not_allowed"))
 
     def test_third_party_exec_statement_warns(self):
-        r = receipt(signal_type="exec_ai_statements", quote_speaker="third_party", evidence_subject="Jane Doe",
-                    quote="We will deploy generative AI across every research workflow")
+        r = receipt(signal_type="leader_priority_statement", quote_speaker="third_party", evidence_subject="Jane Doe",
+                    quote="We will deploy service improvements across every research workflow")
         code, out = self.run_gate(r)
         self.assertEqual(code, 0)
         self.assertEqual(out["bundle"]["warnings"], ["third_party_paraphrase"])
 
-    def test_third_party_other_type_no_warning(self):
+    def test_third_party_other_type_also_warns(self):
         code, out = self.run_gate(receipt(quote_speaker="third_party"))
         self.assertEqual(code, 0)
-        self.assertNotIn("warnings", out["bundle"])
+        self.assertEqual(out["bundle"]["warnings"], ["third_party_paraphrase"])
 
     def test_future_date_unusable(self):
         code, out = self.run_gate(receipt(published_date="2026-10-01"))
@@ -126,7 +126,7 @@ class EvidenceGate(unittest.TestCase):
         for classification in ("early_indication", "general_mention"):
             code, out = self.run_gate(receipt(classification=classification))
             self.assertEqual((code, out["reason"]), (1, "discovery_only"))
-        for relevance in ("customer_product", "unclear"):
+        for relevance in ("outside_offer", "unclear"):
             code, out = self.run_gate(receipt(relevance=relevance))
             self.assertEqual((code, out["reason"]), (1, "discovery_only"))
         for signal_type in ("single_job_post", "discovery_only"):
@@ -164,8 +164,8 @@ class LinkedInPostDates(unittest.TestCase):
 
     def test_url_forms_decode(self):
         i = synthetic_post_id(NOON)
-        for url in (f"https://www.linkedin.com/posts/acme-corp_ai-leadership-activity-{i}-AbCd",
-                    f"https://www.linkedin.com/posts/acme-corp_ai-ugcPost-{i}-x_Yz",
+        for url in (f"https://www.linkedin.com/posts/acme-corp_operations-leadership-activity-{i}-AbCd",
+                    f"https://www.linkedin.com/posts/acme-corp_operations-ugcPost-{i}-x_Yz",
                     f"https://www.linkedin.com/feed/update/urn:li:activity:{i}/",
                     f"https://www.linkedin.com/feed/update/urn:li:ugcPost:{i}?commentUrn=x",
                     f"https://linkedin.com/feed/update/urn%3Ali%3Ashare%3A{i}",
@@ -176,7 +176,7 @@ class LinkedInPostDates(unittest.TestCase):
         i = synthetic_post_id(NOON)
         for url in ("https://acme.example/news", f"https://acme.example/posts/x-activity-{i}-AbCd",
                     f"https://notlinkedin.com/feed/update/urn:li:activity:{i}",
-                    "https://www.linkedin.com/company/acme/", "https://www.linkedin.com/pulse/acme-ai-plan-jane-doe",
+                    "https://www.linkedin.com/company/acme/", "https://www.linkedin.com/pulse/acme-operations-plan-jane-doe",
                     "https://www.linkedin.com/feed/update/urn:li:activity:1234567890123456"):  # decodes to 1970
             self.assertIsNone(gate.linkedin_post_instant(url), url)
 
@@ -193,14 +193,14 @@ class LinkedInPostDates(unittest.TestCase):
         self.assertEqual((code, out["reason"], out["date_basis"]), (1, "stale", "linkedin_post_id"))
 
     def test_matching_date_passes_across_timezone_edge(self):
-        url = f"https://www.linkedin.com/posts/acme_ai-activity-{synthetic_post_id(EDGE)}-AbCd"
+        url = f"https://www.linkedin.com/posts/acme_operations-activity-{synthetic_post_id(EDGE)}-AbCd"
         for given in ("2026-09-09", "2026-09-10"):  # Pacific date and UTC date of the same instant
             code, out = self.grade(receipt(source_url=url, published_date=given))
             self.assertEqual(code, 0, out)
             self.assertEqual(out["bundle"]["date_basis"], "published")
 
     def test_mismatched_date_is_unusable(self):
-        url = f"https://www.linkedin.com/posts/acme_ai-activity-{synthetic_post_id(EDGE)}-AbCd"
+        url = f"https://www.linkedin.com/posts/acme_operations-activity-{synthetic_post_id(EDGE)}-AbCd"
         for given in ("2026-09-08", "2026-09-11", "2026-08-10"):
             code, out = self.grade(receipt(source_url=url, published_date=given))
             self.assertEqual((code, out["reason"]), (2, "published_date_disagrees_with_post_id"), given)
@@ -241,7 +241,7 @@ class TimezoneAndSource(unittest.TestCase):
 
     def test_taxonomy_keeps_source(self):
         self.assertTrue(self.types["paid_individuals_present"]["source"].endswith(".sql"))
-        self.assertIsNone(self.types["ai_exec_appointment"]["source"])
+        self.assertIsNone(self.types["relevant_leader_appointment"]["source"])
 
     def test_warehouse_sourced_type_never_qualifies_from_a_page(self):
         code, out = gate.grade(receipt(signal_type="paid_individuals_present"), PAGE, self.scan, self.types, TODAY)

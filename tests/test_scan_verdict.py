@@ -18,9 +18,9 @@ sys.path.insert(0, str(SCRIPTS))
 import scan_verdict as sv  # noqa: E402
 
 
-def q(tier, date, stype="ai_hiring_cluster"):
+def q(tier, date, stype="relevant_hiring_cluster"):
     return {"outcome": "qualified", "bundle": {"tier": tier, "published_date": date, "signal_type": stype,
-        "classification": "active_initiative", "relevance": "employee_use"}}
+        "classification": "active_initiative", "relevance": "relevant_to_offer", "fit_reason": "The evidenced initiative matches the configured offer and its stated limits."}}
 
 
 NO = {"outcome": "no_usable_signal", "reason": "quote_not_in_page"}
@@ -49,10 +49,10 @@ class ScanVerdict(unittest.TestCase):
         self.assertEqual(v["recommended"], 2)  # tie on date goes to the lower number
 
     def test_legacy_or_api_bundle_cannot_recommend_outreach(self):
-        for change in ({"classification": None}, {"classification": "early_indication"}, {"relevance": "customer_product"}):
+        for change in ({"classification": None}, {"classification": "early_indication"}, {"relevance": "outside_offer"}):
             output = q("tier1", "2026-09-24")
             output["bundle"].update(change)
-            self.assertEqual(sv.verdict([output])["reason"], "qualified_bundle_without_active_employee_use")
+            self.assertEqual(sv.verdict([output])["reason"], "qualified_bundle_without_active_relevant_to_offer")
 
     def test_missing_date_sorts_last(self):
         v = sv.verdict([q("tier1", None), q("tier1", "2026-07-01")])

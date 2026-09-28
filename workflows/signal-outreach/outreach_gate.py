@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""Check one outreach packet before a Gmail draft proposal. Never sends or proves approval.
+"""Check one outreach packet before an email draft proposal. Never sends or proves approval.
 
 Caller: signal-outreach. Usage: python3 workflows/signal-outreach/outreach_gate.py --packet p.json
 [--shared _shared] [--now ISO-with-offset]. --now is for tests only.
 
 Packet:
-  bundle: the current evidence_gate bundle (classification active_initiative, relevance employee_use),
+  bundle: the current evidence_gate bundle (classification active_initiative, relevance relevant_to_offer),
     or a paid_individuals_present wrapper with published_date, checked_at, quote, account_name,
     account_domain, date_basis warehouse, and the complete privacy-checked adoption_bundle.
   talk_track: {angle: plain-language angle from talk-track.md, persona: verified responsibility,
                pick_reason: one sentence connecting the source, person, and message}
-  recipient: {email, name, source, title, contact_id: Salesforce Contact Id or null}
-  activity: unfiltered live-read rows {kind: task|event|gmail_sent, date: YYYY-MM-DD,
+  recipient: {email, name, source, title, contact_id: CRM Contact Id or null}
+  activity: unfiltered live-read rows {kind: task|event|email_sent, date: YYYY-MM-DD,
              who: Contact/Lead Id|email|null, status and subtype for tasks}.
-  reads: {tasks, events, gmail_sent}, each {complete: true, query_reference: native call reference,
+  reads: {tasks, events, email_sent}, each {complete: true, query_reference: native call reference,
           checked_at: aware timestamp, account_domain: bundle domain, recipient_email: recipient,
           window_start: YYYY-MM-DD}. An empty activity list never stands in for these receipts.
-  account: {id, domain, owner_id, owner_is_active: true, open_opportunity_ids: []},
-          current native Account and Opportunity reads; procedure retains their call references.
+  account: {id, domain, owner_id, owner_is_active: true, open_deal_ids: []},
+          current native Account and deal reads; procedure retains their call references.
   draft: {subject, body}
 
-Checks: qualifying signal id; active employee-use public evidence; warehouse privacy and exact allowed
+Checks: qualifying signal id; active offer-relevant public evidence; warehouse privacy and exact allowed
 statement; published-date freshness; aware checked_at within policy; nonempty messaging judgment;
 talk-track review date; recipient identity/domain/source; contact-specific suppression; numbers grounded
 in the quote. Meeting-invitation minute spans in the single question are exempt. Unrecognized titles do
@@ -114,6 +114,8 @@ def strip_invite_minutes(body):
 def warehouse_reasons(b, shared):
     """Check 1 for a signal type whose taxonomy entry names a non-web source."""
     us = common.load_policy(shared)["user_scan"]
+    if us.get("enabled") is not True:
+        return ["subscription adoption is disabled; enable and review the optional module before using its claims"]
     ab = b.get("adoption_bundle")
     if not isinstance(ab, dict):
         return [f"{b['signal_type']} needs adoption_bundle, the privacy-checked signal-user-scan bundle"]
@@ -123,7 +125,7 @@ def warehouse_reasons(b, shared):
         reasons.append(f"adoption_bundle adoption is {ab.get('adoption')!r}, {b['signal_type']} needs individuals_only")
     if norm(b.get("quote") or "") != norm(us["statements"]["individuals_only"]):
         reasons.append("bundle quote must equal user_scan.statements.individuals_only")
-    for key in ("account_name", "account_domain", "salesforce_account_id", "data_through_date"):
+    for key in ("account_name", "account_domain", "crm_account_id", "data_through_date"):
         if not nonblank(ab.get(key)):
             reasons.append(f"adoption_bundle {key} must be a nonempty string")
     for wrapper_key, embedded_key in (("account_name", "account_name"), ("account_domain", "account_domain"),
@@ -172,8 +174,10 @@ def check(p, pol, shared, now):
                 reasons.append("web bundle requires a verified date_basis")
             if b.get("classification") != "active_initiative":
                 reasons.append("web bundle needs active_initiative classification; rescan old bundles")
-            if b.get("relevance") != "employee_use":
-                reasons.append("web bundle must establish employee_use; API and unclear findings do not enter this workflow")
+            if not nonblank(b.get("fit_reason")):
+                reasons.append("web bundle requires an evidence-to-offer fit_reason")
+            if b.get("relevance") != "relevant_to_offer":
+                reasons.append("web bundle must establish relevant_to_offer; outside-offer and unclear findings do not enter this workflow")
         if warehouse:
             if b.get("gate") == "evidence_gate" or b.get("source_url"):
                 reasons.append(f"{b['signal_type']} is sourced from {stype['source']}, not the web. "
@@ -213,27 +217,27 @@ def check(p, pol, shared, now):
     if rc.get("source") not in pol["recipient_sources"]:
         reasons.append("recipient source not in policy. Needs the seller to supply the address in this conversation")
     contact_id = rc.get("contact_id")
-    if rc.get("source") == "existing Salesforce Contact with Email" and not nonblank(contact_id):
-        reasons.append("Salesforce Contact recipient needs a nonempty contact_id")
+    if rc.get("source") == "existing CRM contact with email" and not nonblank(contact_id):
+        reasons.append("CRM Contact recipient needs a nonempty contact_id")
     elif contact_id is not None and not nonblank(contact_id):
         reasons.append("recipient contact_id must be a nonempty string or null")
     account = p.get("account")
     if not isinstance(account, dict):
-        reasons.append("current account ownership and opportunity facts are required")
+        reasons.append("current account ownership and deal facts are required")
     else:
         if not nonblank(account.get("id")) or domain(account.get("domain")) != account_domain:
             reasons.append("account identity must match the bundle")
-        if b.get("salesforce_account_id") and account.get("id") != b["salesforce_account_id"]:
+        if b.get("crm_account_id") and account.get("id") != b["crm_account_id"]:
             reasons.append("account id must match the bundle")
         ab = b.get("adoption_bundle", {})
-        if ab.get("salesforce_account_id") and account.get("id") != ab["salesforce_account_id"]:
+        if ab.get("crm_account_id") and account.get("id") != ab["crm_account_id"]:
             reasons.append("account id must match the adoption bundle")
-        if account.get("owner_id") != common.load_policy(shared)["identity"]["sfdc_user_id"] or account.get("owner_is_active") is not True:
+        if account.get("owner_id") != common.load_policy(shared)["identity"]["crm_user_id"] or account.get("owner_is_active") is not True:
             reasons.append("account must be actively owned by the configured seller")
-        if account.get("open_opportunity_ids") != []:
-            reasons.append("account opportunity read must establish no open Opportunities")
+        if account.get("open_deal_ids") != []:
+            reasons.append("account deal read must establish no open deals")
     reads = p.get("reads")
-    for name in ("tasks", "events", "gmail_sent"):
+    for name in ("tasks", "events", "email_sent"):
         receipt = reads.get(name) if isinstance(reads, dict) else None
         if not isinstance(receipt, dict) or receipt.get("complete") is not True:
             reasons.append(name + " requires a completed native-read receipt")
@@ -250,26 +254,34 @@ def check(p, pol, shared, now):
             reasons.append(name + " read window does not cover activity_lookback_days")
     # check 7
     cutoff = today - timedelta(days=pol["suppression_days"])
-    me = {v.strip().lower() for v in (email, contact_id) if nonblank(v)}
     for a in act:
-        if not isinstance(a, dict) or a.get("kind") not in ("task", "event", "gmail_sent"):
-            raise ValueError("activity row needs kind task, event, or gmail_sent")
+        if not isinstance(a, dict) or a.get("kind") not in ("task", "event", "email_sent"):
+            raise ValueError("activity row needs kind task, event, or email_sent")
         activity_date = d(a.get("date"))
         if a["kind"] == "task" and (not nonblank(a.get("status")) or not nonblank(a.get("subtype"))):
             raise ValueError("activity task needs a nonempty status and subtype")
         who = a.get("who")
         if who is not None and not isinstance(who, str):
             raise ValueError("activity who must be a string or null")
-        if nonblank(who) and not (email_domain(who) or re.fullmatch(r"(?:003|00Q)[A-Za-z0-9]+", who.strip(), re.I)):
-            raise ValueError("activity who must be a Contact/Lead Id or email address, or blank when unknown")
+        who_kind = a.get("who_kind")
+        if nonblank(who):
+            if who_kind == "email":
+                if not email_domain(who):
+                    raise ValueError("activity email must be one complete address")
+            elif who_kind == "contact_id":
+                if not common.opaque_id(who):
+                    raise ValueError("activity contact_id must be an opaque ID")
+            else:
+                raise ValueError("nonempty activity who needs who_kind email or contact_id")
         status = None
         if a["kind"] == "task":
             status = pol["task_status_map"].get(a["status"])
             if status not in ("completed", "open", "cancelled"):
                 reasons.append("unmapped Task status: " + a["status"])
-        done = a["kind"] in ("gmail_sent", "event") or (
+        done = a["kind"] in ("email_sent", "event") or (
             status == "completed" and a["subtype"] in pol["suppressing_task_subtypes"])
-        mine = not nonblank(who) or who.strip().lower() in me
+        mine = (not nonblank(who) or (who_kind == "email" and (not nonblank(email) or who.lower() == email.lower()))
+                or (who_kind == "contact_id" and (not nonblank(contact_id) or who == contact_id)))
         if done and mine and activity_date >= cutoff:
             reasons.append(f"suppressed: {a['kind']} on {a['date']} to the recipient inside suppression window")
             break

@@ -19,16 +19,16 @@ import common  # noqa: E402
 import followup_gate as fg  # noqa: E402
 
 POLICY = common.load_policy()
-SELLER = POLICY["identity"]["sfdc_user_id"]
+SELLER = POLICY["identity"]["crm_user_id"]
 TODAY = date(2026, 9, 21)
 
 BASE = {
-    "sent": [{"message_id": "m1", "thread_id": "t1", "subject": "Context engineering inside Example Buyer",
+    "sent": [{"message_id": "m1", "is_sent": True, "thread_id": "t1", "subject": "Context engineering inside Example Buyer",
               "sent_at": "2026-09-21T14:05:00-07:00", "to": "jordan@buyer.example"}],
     "account": {"id": "001A", "owner_id": SELLER},
     "contacts": [{"id": "003A", "email": "Jordan@Buyer.example"}],
     "tasks": [{"id": "00T1", "subject": "LinkedIn - Connected", "description": ""}],
-    "signal": {"signal_type": "ai_exec_appointment", "unit": "Q2"},
+    "signal": {"signal_type": "relevant_leader_appointment", "unit": "Q2"},
 }
 
 
@@ -43,37 +43,37 @@ class Allow(unittest.TestCase):
         out = fg.check(copy.deepcopy(BASE), "standard", POLICY, today=TODAY)
         self.assertEqual(out["verdict"], "allow")
         t = out["task"]
-        self.assertEqual(t["Subject"], "Follow up: Context engineering inside Example Buyer")
-        self.assertEqual(t["WhoId"], "003A")
-        self.assertEqual(t["WhatId"], "001A")
-        self.assertEqual(t["OwnerId"], SELLER)
-        self.assertEqual(t["Status"], "Not Started")
-        self.assertEqual(t["TaskSubtype"], "Task")
-        self.assertEqual(t["ActivityDate"], "2026-09-28")
-        self.assertIn("m1", t["Description"])
-        self.assertIn("t1", t["Description"])
-        self.assertIn("signal_type ai_exec_appointment", t["Description"])
-        self.assertIn(" Q2.", t["Description"])
-        self.assertNotIn("completed_work", t["Description"])
+        self.assertEqual(t["subject"], "Follow up: Context engineering inside Example Buyer")
+        self.assertEqual(t["contact_id"], "003A")
+        self.assertEqual(t["account_id"], "001A")
+        self.assertEqual(t["owner_id"], SELLER)
+        self.assertEqual(t["status"], "Not Started")
+        self.assertEqual(t["subtype"], "Task")
+        self.assertEqual(t["due_date"], "2026-09-28")
+        self.assertIn("m1", t["description"])
+        self.assertIn("t1", t["description"])
+        self.assertIn("signal_type relevant_leader_appointment", t["description"])
+        self.assertIn(" Q2.", t["description"])
+        self.assertNotIn("completed_work", t["description"])
         self.assertNotIn("Type", t)
 
     def test_core_unit_allows(self):
-        out = run(signal={"signal_type": "ai_exec_appointment", "unit": "core.4"})
+        out = run(signal={"signal_type": "relevant_leader_appointment", "unit": "core.4"})
         self.assertEqual(out["verdict"], "allow")
-        self.assertIn(" core.4.", out["task"]["Description"])
+        self.assertIn(" core.4.", out["task"]["description"])
 
     def test_historical_labels_survive_catalog_changes(self):
         out = run(signal={"signal_type": "retired_signal", "angle": "Previous approved angle"})
         self.assertEqual(out["verdict"], "allow")
-        self.assertIn("Previous approved angle", out["task"]["Description"])
+        self.assertIn("Previous approved angle", out["task"]["description"])
 
     def test_missing_historical_labels_block(self):
-        for signal in ({"signal_type": "", "angle": "Context"}, {"signal_type": "ai_exec_appointment", "angle": " "}):
+        for signal in ({"signal_type": "", "angle": "Context"}, {"signal_type": "relevant_leader_appointment", "angle": " "}):
             out = run(signal=signal)
             self.assertEqual(out["verdict"], "block")
 
     def test_old_talk_track_id_key_is_not_read(self):
-        out = run(signal={"signal_type": "ai_exec_appointment", "talk_track_id": "Q2"})
+        out = run(signal={"signal_type": "relevant_leader_appointment", "talk_track_id": "Q2"})
         self.assertIn("signal angle must be a nonempty label from the approved outreach verdict", out["reasons"])
 
     def test_missing_signal_blocks(self):
@@ -98,8 +98,8 @@ class DueDate(unittest.TestCase):
         p["signal"] = {"signal_type": "arr_growth", "unit": "arr_growth"}
         out = fg.check(p, "arr_growth", POLICY, today=TODAY)
         self.assertEqual(out["verdict"], "allow")
-        self.assertIn("signal_type arr_growth", out["task"]["Description"])
-        self.assertIn(" arr_growth.", out["task"]["Description"])
+        self.assertIn("signal_type arr_growth", out["task"]["description"])
+        self.assertIn(" arr_growth.", out["task"]["description"])
         p["signal"] = {"signal_type": "arr_growth", "unit": "Q2"}
         out = fg.check(p, "arr_growth", POLICY, today=TODAY)
         self.assertIn("arr_growth mode needs signal_type and unit both arr_growth", out["reasons"])
@@ -131,25 +131,25 @@ class Block(unittest.TestCase):
 
     def test_missing_field(self):
         p = copy.deepcopy(BASE)
-        del p["sent"][0]["thread_id"]
-        self.assertEqual(fg.check(p, "standard", POLICY, today=TODAY)["reasons"], ["sent hit missing thread_id"])
+        del p["sent"][0]["subject"]
+        self.assertEqual(fg.check(p, "standard", POLICY, today=TODAY)["reasons"], ["sent hit missing subject"])
 
     def test_missing_fields_accumulate_with_other_reasons(self):
         p = copy.deepcopy(BASE)
-        del p["sent"][0]["thread_id"]
+        del p["sent"][0]["subject"]
         del p["sent"][0]["to"]
         p["account"]["owner_id"] = "005OTHER"
         p["signal"]["unit"] = ""
         out = fg.check(p, "standard", POLICY, today=TODAY)
         self.assertEqual(out["verdict"], "block")
         self.assertIn("signal angle must be a nonempty label from the approved outreach verdict", out["reasons"])
-        self.assertIn("sent hit missing thread_id", out["reasons"])
+        self.assertIn("sent hit missing subject", out["reasons"])
         self.assertIn("sent hit missing to", out["reasons"])
-        self.assertIn("account owner is not identity.sfdc_user_id", out["reasons"])
+        self.assertIn("account owner is not identity.crm_user_id", out["reasons"])
 
     def test_wrong_owner(self):
         out = run(account={"id": "001A", "owner_id": "005OTHER"})
-        self.assertIn("account owner is not identity.sfdc_user_id", out["reasons"])
+        self.assertIn("account owner is not identity.crm_user_id", out["reasons"])
 
     def test_zero_contacts(self):
         self.assertIn("contact match count 0, need exactly 1", run(contacts=[])["reasons"])
@@ -176,7 +176,7 @@ class Block(unittest.TestCase):
         self.assertEqual(out["reasons"], ["duplicate Task 00T9"])
 
     def test_duplicate_by_message_id(self):
-        out = run(tasks=[{"id": "00T8", "subject": "anything", "description": "Gmail message m1; thread t1."}])
+        out = run(tasks=[{"id": "00T8", "subject": "anything", "description": "email provider message m1; thread t1."}])
         self.assertEqual(out["reasons"], ["duplicate Task 00T8"])
 
     def test_open_followup_task_blocks(self):

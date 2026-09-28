@@ -1,6 +1,6 @@
 ---
 workflow: signal-user-scan
-reads: .local/config/policy.yaml, Salesforce, Snowflake
+reads: .local/config/policy.yaml, CRM, the configured warehouse
 writes: nothing
 next: signal-outreach with the privacy-checked bundle, on request
 ---
@@ -17,8 +17,8 @@ Read `setup/providers.md` for tool discovery, complete reads, pre-write revalida
 
 ## Steps
 
-1. Read `.local/config/policy.yaml` (`user_scan`, `salesforce`, `identity`, `warehouse`). Never restate its values in the report.
-2. Resolve the account in Salesforce. Query Account by Id or Name. Record Id, Name, Website, OwnerId, Owner.IsActive, and open Opportunities per `policy.salesforce.open_opportunity`. Route per the `_shared/scripts/route_candidate.py` route table. Anything but `scan` stops and reports the route (`active_deal` or `owned_elsewhere`). Zero or many matches is a finding. Ask which Id before continuing.
+1. Read `.local/config/policy.yaml` (`user_scan`, `crm`, `identity`, `warehouse`). Never restate its values in the report.
+2. Resolve the account in CRM. Query Account by Id or Name. Record Id, Name, Website, owner_id, owner_is_active, and open deals per `policy.crm.open_deal`. Route per the `_shared/scripts/route_candidate.py` route table. Anything but `scan` stops and reports the route (`active_deal` or `owned_elsewhere`). Zero or many matches is a finding. Ask which Id before continuing.
 3. Derive the domain from Website. Strip scheme, `www.`, and path. Lowercase. If the domain is in `policy.identity.internal_domains`, stop.
 4. Run the hash-verified private SQL copy named by `policy.warehouse.queries.adoption_lookup.path` through the configured warehouse tools, read-only, async, warehouse `policy.warehouse.name`. Bind the Account Id, the domain, and `policy.warehouse.data_date` in header order. Fetch the one result row only after status is success.
 5. Build the bundle with exactly the keys in `policy.user_scan.bundle_keys`. Split comma lists into arrays, empty string to `[]`. Cast `mapped_org_count` to int. Set `adoption` to one value from `policy.user_scan.adoption_values` by the rule noted beside that key. Save to a file.
@@ -29,7 +29,7 @@ Read `setup/providers.md` for tool discovery, complete reads, pre-write revalida
 ## Report
 
 ```
-Account: <name> | Salesforce: <Id> | Owner: <name, active/inactive> | Route: scan / active_deal / owned_elsewhere
+Account: <name> | CRM: <Id> | Owner: <name, active/inactive> | Route: scan / active_deal / owned_elsewhere
 Domain: <domain> | Data through: <date>
 Adoption: org_adopted / individuals_only / none_found
   Org subscription mapped to this Account: yes/no (<service types>, <platforms>) or none
@@ -46,5 +46,5 @@ Next: individuals_only may go to signal-outreach; org_adopted needs a qualified 
 
 - Any field in `policy.warehouse.forbidden`. Not in the report, not in chat, not roughly.
 - Editing the query to add columns. Change the policy and the check first, in a separate approved edit.
-- Any write to Salesforce, Snowflake, Gmail, or checkout files.
+- Any write to CRM, the configured warehouse, email provider, or checkout files.
 - Drafting or wording a message. That is `signal-outreach`.
