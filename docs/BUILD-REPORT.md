@@ -6,7 +6,7 @@ Built September 27, 2026 as a fresh local repository. This is a reusable Codex t
 
 - Workflow source: the user-supplied **prospect (8).zip**, 47 files, SHA-256 `ad4670b412ba60d007d8b4efb68ee4fbbbe2362bb47a64f90b7b98c400c09c52`.
 - Setup reference: the archived **prospect-template**, verified at commit `9c567bbdc0ecc47347e465196ffa3768df97ae2c`. A tracked-file snapshot was used for comparison; the archived checkout was not edited.
-- A new history was initialized for this build. No old Git history, remotes, private installed configuration or customer records were imported. No GitHub repository was overwritten or published.
+- The build began with a fresh local history. For GitHub publication, the previous hosted template history is retained as merge ancestry while the complete new file tree replaces the old template. The old local checkout remains archived and unchanged. No private installed configuration or customer records were imported.
 
 The ZIP remains the implementation base for the six operational workflows and their Python/SQL contracts. The earlier template supplied the guided interview, pinned source snapshots, voice/evidence review, staged setup, provider separation and optional-module patterns. The old numbered claim/persona engine and operational run-ledger framework were not imported. Readable Markdown owns ICP, signal definitions and messaging; the chat and native providers own operational state.
 
@@ -56,6 +56,6 @@ This is an umbrella of independent workflows with shared configuration. The oper
 
 The checks establish local mechanics, not source truth, permission, actual user approval, live provider access or delivery. Claim and persona meaning, source coverage, customer naming permission and voice quality need review. SQL checks include static contracts and a SQLite fixture, not Snowflake schema/syntax certification. The record mapping helper executes local structural transformations. Capability declarations still need actual connectors and reviewed query/envelope translations; they are not authenticated production adapters. No live provider tools were called to build this repo. No automated MIME adapter is shipped because the actual connected schemas must determine the mapping.
 
-The GitHub Actions workflow is supplied but has not run remotely. Only Python 3.9.6 was exercised locally; the configured 3.13 CI leg remains unverified. Codex's documented .agents/skills layout is validated, but skill-menu discovery has not been smoke-tested in a newly opened project/chat.
+The GitHub Actions workflow tests Python 3.9 and 3.13 on pushes and pull requests. Local build verification used Python 3.9.6; consult the checks for the published commit for remote results. Codex's documented .agents/skills layout is validated, but skill-menu discovery has not been smoke-tested in a newly opened project/chat.
 
 Open the repository in Codex, create the local Python environment, select **prospect-setup** from the `/` skill menu, and review the proposed business configuration. Finish provider mappings and authorized read-only compatibility checks for the selected workflow before proposing live writes. Email sending remains manual.
