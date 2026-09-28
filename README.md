@@ -39,18 +39,80 @@ CRM and email providers are configurable. Setup maps your available tools, recor
 
 ## Repository map
 
-The map shows where each part lives and how it connects to the others.
+```text
+prospect-template/
+├── AGENTS.md                         # Routes requests to workflows
+├── CONTEXT.md                        # Handoffs, approvals and storage rules
+│
+├── .agents/
+│   └── skills/                       # Eight small workflow entry points
+│
+├── workflows/
+│   ├── prospect-setup/
+│   ├── signal-refresh/
+│   ├── signal-prospector/
+│   ├── signal-scan/
+│   ├── signal-user-scan/
+│   ├── signal-outreach/
+│   ├── signal-followup/
+│   └── signal-arr-growth/
+│
+├── setup/                            # Onboarding and provider guides
+│   ├── CONTEXT.md
+│   ├── installation.md
+│   ├── questionnaire.md
+│   ├── providers.md
+│   ├── source-format.md
+│   └── subscription-interface.md
+│
+├── examples/
+│   └── config/                       # Fictional starter configuration
+│       ├── policy.yaml
+│       ├── icp.md
+│       ├── signals.md
+│       ├── talk-track.md
+│       ├── voice.md
+│       ├── providers.yaml
+│       └── sources.json
+│
+├── _shared/
+│   ├── CONTEXT.md
+│   └── scripts/                      # Shared gates and provider mapping
+│
+├── scripts/                          # Setup, refresh, preflight and maintenance
+│
+├── _templates/
+│   └── workflow/                     # Starter files for a new workflow
+│       ├── CONTEXT.md
+│       └── procedure.md
+│
+├── tests/                            # Synthetic workflow and setup tests
+├── .github/
+│   └── workflows/
+│       └── checks.yml                # Python 3.9 and 3.13 CI
+│
+├── docs/
+│   └── BUILD-REPORT.md
+│
+├── .local/                           # Created as needed; ignored by Git
+│   ├── config/                       # Installed business and provider settings
+│   ├── setup/                        # Proposals, reviews and receipts
+│   ├── sources/                      # Permitted source snapshots
+│   └── queries/                      # Reviewed private warehouse queries
+│
+├── README.md
+├── requirements.txt
+├── .gitignore
+└── LICENSE
+```
 
-![Repository map: Codex skill pointers open one of eight workflows. Workflows read local business configuration, use shared checks, and produce reviewed results in chat, CRM and email.](docs/repository-map.svg)
-
-[Open the full-size map](docs/repository-map.svg). Arrows show how commands open workflows
-and what those workflows read, use and produce. Choose workflows independently; handoffs follow the user's
-request and the review boundaries in [CONTEXT.md](CONTEXT.md).
+Each folder under `workflows/` contains a `CONTEXT.md` contract and a `procedure.md`.
+Workflow-specific Python checks and SQL files sit beside those instructions.
+The corresponding entry in `.agents/skills/` contains a small `SKILL.md` pointer.
 
 Start with [setup](setup/installation.md). [Provider contracts](setup/providers.md)
-explain how CRM and email connect. `.local/` holds installed configuration, setup
-reviews, permitted source snapshots and private query copies; it is ignored by Git.
-Customer records and temporary operational files stay outside the checkout.
+explain how CRM and email connect. Operational results live in chat and native
+provider records; temporary customer files stay outside the checkout.
 
 ## Maintenance
 
