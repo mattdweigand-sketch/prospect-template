@@ -39,17 +39,47 @@ CRM and email providers are configurable. Setup maps your available tools, recor
 
 ## Repository map
 
-| Path | Purpose |
-|---|---|
-| `AGENTS.md`, `CONTEXT.md` | Routing, handoffs and state boundaries |
-| `.agents/skills/` | Eight short command pointers |
-| `workflows/` | Eight contracts and procedures; six operational gates/query interfaces |
-| `setup/` | Interview, installation, providers and source evidence format |
-| `examples/config/` | Fictional configuration used only for learning and tests |
-| `.local/` (ignored) | Installed config, setup reviews, permitted snapshots and private query copies |
-| `_shared/scripts/`, `scripts/` | Shared gates and local setup/refresh tools |
-| `tests/`, `.github/workflows/checks.yml` | Local behavioral checks and CI definition |
-| `docs/BUILD-REPORT.md` | Rebuild provenance, verification and limits |
+```text
+prospect-template/
+├── README.md                      # Getting started and choosing a workflow
+├── AGENTS.md                      # Routes Codex requests to the right workflow
+├── CONTEXT.md                     # Handoffs, approvals and where work is stored
+├── .agents/skills/                # Eight small skill entry points
+├── workflows/                     # Instructions and checks for each workflow
+│   ├── prospect-setup/            # Configure your business and providers
+│   ├── signal-refresh/            # Review changes to your source material
+│   ├── signal-prospector/         # Find accounts and propose CRM claims
+│   ├── signal-scan/               # Research an account's public buying signals
+│   ├── signal-user-scan/          # Check permitted product adoption (optional)
+│   ├── signal-outreach/           # Prepare one reviewed email draft
+│   ├── signal-followup/           # Create a follow-up task after a proven send
+│   └── signal-arr-growth/         # Find growing subscription accounts (optional)
+├── setup/                         # Setup interview, installation and provider guides
+├── examples/config/               # Fictional starting configuration
+├── _shared/                       # Shared reference guide and Python checks
+│   └── scripts/                   # Evidence, privacy, routing, mapping and readback
+├── scripts/                       # Setup, refresh, preflight and maintenance tools
+├── _templates/workflow/           # Starter files for adding a workflow
+├── tests/                         # Tests using synthetic data and provider responses
+├── .github/workflows/checks.yml   # CI checks on Python 3.9 and 3.13
+├── docs/BUILD-REPORT.md            # Build provenance, verification and limits
+├── .gitignore                     # Keeps local configuration and runtime files out of Git
+├── requirements.txt               # Python dependency
+└── LICENSE                        # MIT license
+```
+
+Each workflow has a `CONTEXT.md` describing its inputs and handoffs, plus a
+`procedure.md` with the steps. Its skill points to those files.
+
+Setup stores local files under `.local/`, which is created as needed and ignored by Git:
+
+```text
+.local/
+├── config/                        # Your installed business and provider configuration
+├── setup/                         # Configuration proposals, reviews and receipts
+├── sources/                       # Source snapshots, when retention is permitted
+└── queries/                       # Reviewed private queries for optional warehouse modules
+```
 
 Operational outputs live in the chat, your email provider and CRM. Temporary customer files stay outside the checkout. There is no send tool, automatic provider setup, scheduled runner, or provider credential bundled here. See [installation](setup/installation.md) and [provider contracts](setup/providers.md) for the concrete steps.
 
