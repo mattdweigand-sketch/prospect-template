@@ -1,6 +1,6 @@
 # Prospect handoffs and state
 
-This is an umbrella workspace: eight independent workflows share a configuration and checks. `AGENTS.md` is the routing owner. Each workflow contract names its inputs, process, output and human check; its procedure supplies the steps.
+This is one prospecting workspace: setup and refresh configure it, four numbered stages describe the main progression, and two optional workflows handle subscription data. The eight skills remain independently callable. `AGENTS.md` is the routing owner. Each workflow contract names its inputs, process, output and human check; its procedure supplies the steps.
 
 | Producer | Consumer and boundary |
 |---|---|

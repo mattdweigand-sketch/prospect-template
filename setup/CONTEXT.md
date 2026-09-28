@@ -1,11 +1,21 @@
-# Setup resources
+# Configure the prospecting workspace
 
-The canonical workflow is `../workflows/prospect-setup/procedure.md`; refresh is `../workflows/signal-refresh/procedure.md`. This folder contains reference material, not an alternate router.
+## Inputs
 
-- `questionnaire.md`: guided interview and meaning-review prompts.
-- `installation.md`: local Python, source modes, stage/review/apply commands and recovery.
-- `providers.md`: runtime capability discovery, field mapping and native readback.
-- `subscription-interface.md`: optional, fictional warehouse-view contracts for subscription businesses.
-- `source-format.md`: source quotes, voice evidence and immutable supplied-material snapshots.
+`references/CONTEXT.md`, supplied offer/ICP/voice materials, and existing local configuration if present. The user supplies missing business facts and retention preferences. Read `templates/` only as fictional scaffolding.
 
-Only the user can settle business choices and approve exact configuration. Setup scripts make review concrete and detect changed files; they never decide fit or contact customers.
+## Process
+
+Follow `procedure.md`: interview, source capture, complete staged configuration, three synthetic previews, exact review, then approved application.
+
+## Output
+
+Private setup artifacts and, after approval, a complete installed configuration and application receipt. No provider/customer write.
+
+## Human check
+
+Review meaning, evidence sufficiency, source limits, naming permission, voice and every proposed file. Approve the exact prepared review before applying.
+
+## Next
+
+Any requested operational workflow after its preflight and live tool discovery. Source updates use `refresh/`.
